@@ -51,7 +51,8 @@ def _load_library_doc_and_mtime(spec_filename, obtain_mutex=True):
             libdoc = builder.build(spec_filename)
             return libdoc, mtime
         except Exception:
-            log.exception("Error when loading spec info from: %s", spec_filename)
+            log.exception(
+                "Error when loading spec info from: %s", spec_filename)
             return None
 
 
@@ -98,7 +99,8 @@ def _create_updated_source_to_mtime(library_doc):
 
 def _create_additional_info(spec_filename, is_builtin, obtain_mutex=True, arguments=None, alias=None):
     try:
-        additional_info = {_IS_BUILTIN: is_builtin, _ARGUMENTS: arguments, _ALIAS:alias}
+        additional_info = {_IS_BUILTIN: is_builtin,
+                           _ARGUMENTS: arguments, _ALIAS: alias}
         if is_builtin:
             # For builtins we don't have to check the mtime
             # (on a new version we update the folder).
@@ -113,7 +115,8 @@ def _create_additional_info(spec_filename, is_builtin, obtain_mutex=True, argume
 
         library_doc = library_doc_and_mtime[0]
 
-        additional_info[_SOURCE_TO_MTIME] = _create_updated_source_to_mtime(library_doc)
+        additional_info[_SOURCE_TO_MTIME] = _create_updated_source_to_mtime(
+            library_doc)
         return additional_info
 
     except:
@@ -133,7 +136,7 @@ def _load_spec_filename_additional_info(spec_filename):
         additional_info_filename = _get_additional_info_filename(spec_filename)
 
         with open(additional_info_filename, "r") as stream:
-            return json.load(stream)        
+            return json.load(stream)
     except:
         log.exception("Unable to load source mtimes from: %s", spec_filename)
         return {}
@@ -185,17 +188,18 @@ class _LibInfo(object):
         self._canonical_spec_filename = spec_filename
         self._additional_info = None
         self._invalid = False
-    
+
     @property
-    def additional_info(self):        
-        if self._additional_info is None:           
-                self._additional_info = _load_spec_filename_additional_info(self._canonical_spec_filename)            
+    def additional_info(self):
+        if self._additional_info is None:
+            self._additional_info = _load_spec_filename_additional_info(
+                self._canonical_spec_filename)
         return self._additional_info
 
     @property
     def alias(self):
         return self.additional_info.get(_ALIAS, None)
-    
+
     def arguments(self):
         return tuple(self.additional_info.get(_ARGUMENTS, []) or [])
 
@@ -214,7 +218,7 @@ class _LibInfo(object):
             return False
 
         additional_info = self.additional_info
-        if additional_info is None:            
+        if additional_info is not None:
             if additional_info.get(_IS_BUILTIN, False):
                 return True
 
@@ -223,17 +227,21 @@ class _LibInfo(object):
                 # Nothing to validate...
                 return True
 
-            updated_source_to_mtime = _create_updated_source_to_mtime(self.library_doc)
+            updated_source_to_mtime = _create_updated_source_to_mtime(
+                self.library_doc)
             if source_to_mtime != updated_source_to_mtime:
                 log.info(
                     "Library %s is invalid. Current source to mtime:\n%s\nChanged from:\n%s"
                     % (self.library_doc.name, source_to_mtime, updated_source_to_mtime)
                 )
                 self._invalid = True
-                return False                        
-            
+                return False
+
             try:
                 if tuple(additional_info.get(_ARGUMENTS, []) or []) != (arguments or ()):
+                    log.info(
+                        "Library %s is invalid. Arguments changes" % self.library_doc.name)
+                    self._invalid = True
                     return False
             except:
                 pass
@@ -323,13 +331,15 @@ class _FolderInfo(object):
                     for root, _dirs, files in os.walk(folder):
                         for filename in files:
                             if filename.lower().endswith(".libspec"):
-                                seen_libspec_files.add(os.path.join(root, filename))
+                                seen_libspec_files.add(
+                                    os.path.join(root, filename))
         else:
             for folder in folders:
                 if os.path.isdir(folder):
                     for filename in os.listdir(folder):
                         if filename.lower().endswith(".libspec"):
-                            seen_libspec_files.add(os.path.join(folder, filename))
+                            seen_libspec_files.add(
+                                os.path.join(folder, filename))
 
         new_libspec_filename_to_info = {}
 
@@ -355,7 +365,7 @@ class _FolderInfo(object):
 class LibspecManager(ILibspecManager):
     """
     Used to manage the libspec files.
-    
+
     .libspec files are searched in the following directories:
 
     - PYTHONPATH folders                                  (not recursive)
@@ -498,7 +508,7 @@ class LibspecManager(ILibspecManager):
     def root_uri(self):
         return self._root_uri
 
-    @root_uri.setter    
+    @root_uri.setter
     def root_uri(self, value):
         self._root_uri = value
 
@@ -512,7 +522,8 @@ class LibspecManager(ILibspecManager):
         from robotframework_ls.impl.robot_lsp_constants import OPTION_ROBOT_PYTHONPATH
 
         self._config = config
-        existing_entries = set(self._additional_pythonpath_folder_to_folder_info.keys())
+        existing_entries = set(
+            self._additional_pythonpath_folder_to_folder_info.keys())
         if config is not None:
             pythonpath_entries = set(
                 config.get_setting(OPTION_ROBOT_PYTHONPATH, list, [])
@@ -545,7 +556,8 @@ class LibspecManager(ILibspecManager):
                 uris.to_fs_path(folder_uri), recursive=True
             )
             self._workspace_folder_uri_to_folder_info = cp
-            folder_info.start_watch(self._observer, self._spec_changes_notifier)
+            folder_info.start_watch(
+                self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
         else:
             log.debug("Workspace folder already added: %s", folder_uri)
@@ -563,21 +575,25 @@ class LibspecManager(ILibspecManager):
 
     def add_additional_pythonpath_folder(self, folder_path):
         self._check_in_main_thread()
-        
+
         from robocorp_ls_core import uris
 
         if folder_path not in self._additional_pythonpath_folder_to_folder_info:
             log.debug("Added additional pythonpath folder: %s", folder_path)
             cp = self._additional_pythonpath_folder_to_folder_info.copy()
-                        
-            real_path = os.path.abspath(os.path.join(os.path.normpath(uris.to_fs_path(self.root_uri)), folder_path)) if self.root_uri is not None and not os.path.isabs(folder_path) else folder_path
-            
-            folder_info = cp[folder_path] = _FolderInfo(real_path, recursive=True)
+
+            real_path = os.path.abspath(os.path.join(os.path.normpath(uris.to_fs_path(
+                self.root_uri)), folder_path)) if self.root_uri is not None and not os.path.isabs(folder_path) else folder_path
+
+            folder_info = cp[folder_path] = _FolderInfo(
+                real_path, recursive=True)
             self._additional_pythonpath_folder_to_folder_info = cp
-            folder_info.start_watch(self._observer, self._spec_changes_notifier)
+            folder_info.start_watch(
+                self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
         else:
-            log.debug("Additional pythonpath folder already added: %s", folder_path)
+            log.debug(
+                "Additional pythonpath folder already added: %s", folder_path)
 
     def remove_additional_pythonpath_folder(self, folder_path):
         self._check_in_main_thread()
@@ -588,7 +604,8 @@ class LibspecManager(ILibspecManager):
             folder_info.dispose()
             self._additional_pythonpath_folder_to_folder_info = cp
         else:
-            log.debug("Additional pythonpath folder already removed: %s", folder_path)
+            log.debug(
+                "Additional pythonpath folder already removed: %s", folder_path)
 
     def _gen_builtin_libraries(self):
         """
@@ -621,7 +638,8 @@ class LibspecManager(ILibspecManager):
                     for libname in robot_constants.STDLIBS:
                         builtins_libspec_dir = self._builtins_libspec_dir
                         if not os.path.exists(
-                            os.path.join(builtins_libspec_dir, f"{libname}.libspec")
+                            os.path.join(builtins_libspec_dir,
+                                         f"{libname}.libspec")
                         ):
                             wait_for.append(
                                 thread_pool.submit(
@@ -646,28 +664,32 @@ class LibspecManager(ILibspecManager):
 
     def synchronize_workspace_folders(self):
         for folder_info in self._workspace_folder_uri_to_folder_info.values():
-            folder_info.start_watch(self._observer, self._spec_changes_notifier)
+            folder_info.start_watch(
+                self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
 
     def synchronize_pythonpath_folders(self):
         for folder_info in self._pythonpath_folder_to_folder_info.values():
-            folder_info.start_watch(self._observer, self._spec_changes_notifier)
+            folder_info.start_watch(
+                self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
 
     def synchronize_additional_pythonpath_folders(self):
         for folder_info in self._additional_pythonpath_folder_to_folder_info.values():
-            folder_info.start_watch(self._observer, self._spec_changes_notifier)
+            folder_info.start_watch(
+                self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
 
     def synchronize_internal_libspec_folders(self):
         for folder_info in self._internal_folder_to_folder_info.values():
-            folder_info.start_watch(self._observer, self._spec_changes_notifier)
+            folder_info.start_watch(
+                self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
 
     def _synchronize(self):
         """
         Updates the internal caches related to the tracked .libspec files found.
-        
+
         This can be a slow call as it may traverse the whole workspace folders
         hierarchy, so, it should be used only during startup to fill the initial
         info.
@@ -734,8 +756,8 @@ class LibspecManager(ILibspecManager):
         cwd=None,
         additional_path=None,
         is_builtin=False,
-        arguments = None,
-        alias = None
+        arguments=None,
+        alias=None
     ):
         """
         :param str libname:
@@ -768,8 +790,9 @@ class LibspecManager(ILibspecManager):
                 for entry in list(additional_pythonpath_entries):
                     if os.path.exists(entry):
                         call.extend(["-P", entry])
-                
-                libargs = "::".join(arguments) if arguments is not None and len(arguments)>0 else None
+
+                libargs = "::".join(arguments) if arguments is not None and len(
+                    arguments) > 0 else None
                 if libargs is not None:
                     call.append(f"{libname}::{libargs}")
                 else:
@@ -779,16 +802,18 @@ class LibspecManager(ILibspecManager):
                 if libname in robot_constants.STDLIBS:
                     libspec_dir = self._builtins_libspec_dir
 
-                encoded_libname = libname;                
+                encoded_libname = libname
                 if libargs is not None:
                     encoded_libname += f"::{libargs}"
 
                 if alias is not None:
                     encoded_libname += f"@{alias}"
-                                
-                libspec_filename = os.path.join(libspec_dir, urllib.parse.quote(encoded_libname) + ".libspec")
 
-                log.debug(f"Obtaining mutex to generate libpsec: {libspec_filename}.")
+                libspec_filename = os.path.join(
+                    libspec_dir, urllib.parse.quote(encoded_libname) + ".libspec")
+
+                log.debug(
+                    f"Obtaining mutex to generate libpsec: {libspec_filename}.")
                 with timed_acquire_mutex(
                     _get_libspec_mutex_name(libspec_filename)
                 ):  # Could fail.
@@ -853,7 +878,8 @@ class LibspecManager(ILibspecManager):
         finally:
             if log_time:
                 delta = time.time() - curtime
-                log.debug("Took: %.2fs to generate info for: %s" % (delta, libname))
+                log.debug("Took: %.2fs to generate info for: %s" %
+                          (delta, libname))
 
     def dispose(self):
         self._observer.dispose()
@@ -899,7 +925,7 @@ class LibspecManager(ILibspecManager):
         """
         if libname is None:
             return None
-            
+
         libname_lower = libname.lower()
         if libname_lower.endswith((".py", ".class", ".java")):
             libname_lower = os.path.splitext(libname_lower)[0]
@@ -915,7 +941,8 @@ class LibspecManager(ILibspecManager):
                         # Found but it's not in sync. Try to regenerate (don't proceed
                         # because we don't want to match a lower priority item, so,
                         # regenerate and get from the cache without creating).
-                        self._do_create_libspec_on_get(libname, current_doc_uri, arguments, alias)
+                        self._do_create_libspec_on_get(
+                            libname, current_doc_uri, arguments, alias)
 
                         # Note: get even if it if was not created (we may match
                         # a lower priority library).
@@ -932,7 +959,7 @@ class LibspecManager(ILibspecManager):
         if create:
             if self._do_create_libspec_on_get(libname, current_doc_uri, arguments, alias):
                 return self.get_library_info(
-                    libname, create=False, current_doc_uri=current_doc_uri, 
+                    libname, create=False, current_doc_uri=current_doc_uri,
                     arguments=arguments, alias=alias
                 )
 

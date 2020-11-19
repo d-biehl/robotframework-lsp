@@ -1,13 +1,19 @@
-from robocorp_ls_core.lsp import Error
-from robocorp_ls_core.robotframework_log import get_logger
+from typing import Any, Union
+
+from robot.variables import is_scalar_assign
 from robot.parsing.model.blocks import FirstStatementFinder, LastStatementFinder
-from robotframework_ls.impl.ast_utils import MAX_ERRORS, create_error_from_node
 import robot.parsing.model.blocks as blocks
 import robot.parsing.model.statements as statements
 import robot.parsing.lexer.tokens as tokens
-from robot.variables import is_scalar_assign
-from typing import Any, Union
+
+from robocorp_ls_core.lsp import Error
+from robocorp_ls_core.robotframework_log import get_logger
 from robotframework_ls.impl.protocols import ICompletionContext
+from robotframework_ls.impl import ast_utils
+from robotframework_ls.impl.ast_utils import create_error_from_node
+from robotframework_ls.impl.collect_keywords import collect_keywords
+from robotframework_ls.impl.text_utilities import normalize_robot_name
+from robotframework_ls.impl.ast_utils import MAX_ERRORS, create_error_from_node
 
 log = get_logger(__name__)
 
@@ -373,11 +379,26 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
             lib_info = self.completion_context.workspace.libspec_manager.get_library_info(
                 node.name, False, self.completion_context.doc.uri, arguments=node.args, alias=node.alias)
             if lib_info is None:
-                self.append_error(node.get_token(tokens.Token.NAME) or node, f"Importing test library '{node.name}' failed.")
+                self.append_error(node.get_token(
+                    tokens.Token.NAME) or node, f"Importing test library '{node.name}' failed.")
         else:
             self.append_error(node, f"Library setting requires value.")
-            
+
         self.generic_visit(node)
+
+    def visit_ResourceImport(self, node: statements.ResourceImport):
+        if node.name is not None:
+            lib_info = self.completion_context.get_resource_import_as_doc(node)
+            if lib_info is None:
+                self.append_error(node.get_token(
+                    tokens.Token.NAME) or node, f"Resource file '{node.name}' does not exist.")
+        else:
+            self.append_error(node, f"Resource setting requires value.")
+
+        self.generic_visit(node)
+
+    def visit_KeywordCall(self, node: statements.KeywordCall):
+        pass
 
 
 class ErrorVisitor(blocks.ModelVisitor):
@@ -399,10 +420,6 @@ class ErrorVisitor(blocks.ModelVisitor):
 
 
 def collect_analysis_errors(completion_context: ICompletionContext):
-    from robotframework_ls.impl import ast_utils
-    from robotframework_ls.impl.ast_utils import create_error_from_node
-    from robotframework_ls.impl.collect_keywords import collect_keywords
-    from robotframework_ls.impl.text_utilities import normalize_robot_name
 
     errors = []
     collector = _KeywordsCollector()

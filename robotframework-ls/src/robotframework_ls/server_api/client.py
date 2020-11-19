@@ -170,6 +170,30 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
             self._build_msg("signatureHelp", doc_uri=doc_uri, line=line, col=col)
         )
 
+    def request_hover(self, doc_uri, line, col) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+        return self.request_async(
+            self._build_msg("hover", doc_uri=doc_uri, line=line, col=col)
+        )
+    
+    def request_folding_range(self, doc_uri) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+        return self.request_async(
+            self._build_msg("foldingRange", doc_uri=doc_uri)
+        )
+
+    def request_code_lens(self, doc_uri) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+        return self.request_async(
+            self._build_msg("codeLens", doc_uri=doc_uri)
+        )
+
     def request_cancel(self, message_id):
         self._check_process_alive()
         self.write(

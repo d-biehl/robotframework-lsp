@@ -36,9 +36,13 @@ class IRobotDocument(IDocument, Protocol):
     def get_ast(self) -> Any:
         pass
 
+class ILibspecManager:
+    def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=None, alias=None):
+        pass
+
 
 class IRobotWorkspace(IWorkspace, Protocol):
-    libspec_manager: Any
+    libspec_manager: ILibspecManager
 
 
 class IKeywordFound(Protocol):
@@ -139,7 +143,6 @@ class IDefinition(Protocol):
 
 
 class IKeywordDefinition(IDefinition, Protocol):
-
     keyword_found: IKeywordFound
 
 

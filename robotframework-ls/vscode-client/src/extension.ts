@@ -28,6 +28,8 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-lan
 import { ProgressReport, handleProgressMessage } from './progress';
 import { Timing } from './time';
 
+import * as vscode from 'vscode';
+
 const OUTPUT_CHANNEL_NAME = "Robot Framework";
 const OUTPUT_CHANNEL = window.createOutputChannel(OUTPUT_CHANNEL_NAME);
 
@@ -280,6 +282,23 @@ async function getDefaultLanguageServerPythonExecutable(): Promise<ExecutableAnd
 	}
 }
 
+function runTestcase(file: String, testcase: String) {
+	window.showInformationMessage(`run test case ${file} ${testcase}`)
+}
+
+function debugTestcase(file: String, testcase: String) {
+	window.showInformationMessage(`debug test case ${file} ${testcase}`)
+}
+
+function runTestsuite(file: String) {
+	window.showInformationMessage(`run test suite ${file}`)
+}
+
+function debugTestsuite(file: String) {
+	window.showInformationMessage(`debug test suite ${file}`)
+}
+
+
 export async function activate(context: ExtensionContext) {
 	try {
 		// The first thing we need is the python executable.
@@ -374,6 +393,12 @@ export async function activate(context: ExtensionContext) {
 		});
 
 		OUTPUT_CHANNEL.appendLine("RobotFramework Language Server ready. Took: " + timing.getTotalElapsedAsStr());
+
+		// registering Commands
+		vscode.commands.registerCommand("robot.runTestcase", runTestcase)
+		vscode.commands.registerCommand("robot.debugTestcase", debugTestcase)
+		vscode.commands.registerCommand("robot.runTestsuite", runTestsuite)
+		vscode.commands.registerCommand("robot.debugTestsuite", debugTestsuite)
 
 	} finally {
 		workspace.onDidChangeConfiguration(event => {

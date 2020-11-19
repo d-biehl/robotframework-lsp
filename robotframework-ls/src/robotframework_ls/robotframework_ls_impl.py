@@ -207,24 +207,32 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         server_capabilities = {
             "codeActionProvider": False,
-            # "codeLensProvider": {
-            #     "resolveProvider": False,  # We may need to make this configurable
-            # },
+            "codeLensProvider": {
+                "resolveProvider": True,  # We may need to make this configurable
+            },
             "completionProvider": {
                 "resolveProvider": False  # We know everything ahead of time
             },
+            # "semanticTokensProvider": {
+            #     "legend": {
+            #         "tokenTypes": ["keyword", "comment", "string", "number", "operator"],
+            #         "tokenModifiers": ["declaration", "definition", "documentation",]
+            #     },
+            #     "range": True,
+            #     "full": True
+            # },
             "documentFormattingProvider": True,
-            "documentHighlightProvider": False,
+            "documentHighlightProvider": True,
             "documentRangeFormattingProvider": False,
             "documentSymbolProvider": False,
             "definitionProvider": True,
             "executeCommandProvider": {
                 "commands": ["robot.addPluginsDir", "robot.resolveInterpreter"]
             },
-            "hoverProvider": False,
+            "hoverProvider": True,
             "referencesProvider": False,
             "renameProvider": False,
-            "foldingRangeProvider": False,
+            "foldingRangeProvider": True,
             # Note that there are no auto-trigger characters (there's no good
             # character as there's no `(` for parameters and putting it as a
             # space becomes a bit too much).
@@ -292,6 +300,11 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         self._server_manager.exit()
 
         PythonLanguageServer.m_exit(self, **kwargs)
+
+    def m_text_document__document_highlight(
+        self, *args,  **kwargs
+    ) -> Optional[list]:
+        return []    
 
     def m_text_document__formatting(
         self, textDocument=None, options=None
@@ -531,6 +544,7 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         log.info("Unable to get signature (no api available).")
         return []
 
+
     @log_and_silence_errors(log)
     def _signature_help(
         self,
@@ -573,3 +587,196 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
                     return result
 
         return None
+
+    def m_text_document__hover(self, **kwargs):
+        """
+        "params": {
+            "textDocument": {
+                "uri": "file:///x%3A/vscode-robot/local_test/Basic/resources/keywords.robot"
+            },
+            "position": {"line": 7, "character": 22},            
+        },
+        """
+        doc_uri = kwargs["textDocument"]["uri"]
+        # Note: 0-based
+        line, col = kwargs["position"]["line"], kwargs["position"]["character"]
+
+        rf_api_client = self._server_manager.get_regular_rf_api_client(doc_uri)
+        if rf_api_client is not None:
+            func = partial(self._hover, rf_api_client, doc_uri, line, col)
+            func = require_monitor(func)
+            return func
+
+        log.info("Unable to get hover (no api available).")
+        return []
+
+    @log_and_silence_errors(log)
+    def _hover(
+        self,
+        rf_api_client: IRobotFrameworkApiClient,
+        doc_uri: str,
+        line: int,
+        col: int,
+        monitor: Monitor,
+    ) -> Optional[dict]:
+        from robocorp_ls_core.client_base import wait_for_message_matcher
+
+        ws = self.workspace
+        if not ws:
+            log.critical("Workspace must be set before getting hover.")
+            return None
+
+        document = ws.get_document(doc_uri, accept_from_file=True)
+        if document is None:
+            log.critical("Unable to find document (%s) for hover." % (doc_uri,))
+            return None
+
+        # Asynchronous completion.
+        message_matcher: Optional[
+            IIdMessageMatcher
+        ] = rf_api_client.request_hover(doc_uri, line, col)
+        if message_matcher is None:
+            log.debug("Message matcher for hover returned None.")
+            return None
+
+        if wait_for_message_matcher(
+            message_matcher,
+            rf_api_client.request_cancel,
+            DEFAULT_COMPLETIONS_TIMEOUT,
+            monitor,
+        ):
+            msg = message_matcher.msg
+            if msg is not None:
+                result = msg.get("result")
+                if result:
+                    return result
+
+        return None
+
+    def m_text_document__folding_range(
+            self, *args,  **kwargs
+        ) -> Optional[list]:
+        """
+        "params": {
+            "textDocument": {
+                "uri": "file:///x%3A/vscode-robot/local_test/Basic/resources/keywords.robot"
+            }
+        },
+        """
+
+        doc_uri = kwargs["textDocument"]["uri"]       
+
+        rf_api_client = self._server_manager.get_regular_rf_api_client(doc_uri)
+        if rf_api_client is not None:
+            func = partial(self._folding_range, rf_api_client, doc_uri)
+            func = require_monitor(func)
+            return func
+
+        log.info("Unable to get folding range (no api available).")
+        return []
+
+    @log_and_silence_errors(log)
+    def _folding_range(
+        self,
+        rf_api_client: IRobotFrameworkApiClient,
+        doc_uri: str,       
+        monitor: Monitor,
+    ) -> Optional[dict]:
+        from robocorp_ls_core.client_base import wait_for_message_matcher
+     
+        ws = self.workspace
+        if not ws:
+            log.critical("Workspace must be set before getting hover.")
+            return None
+
+        document = ws.get_document(doc_uri, accept_from_file=True)
+        if document is None:
+            log.critical("Unable to find document (%s) for folding range." % (doc_uri,))
+            return None
+
+        # Asynchronous completion.
+        message_matcher: Optional[
+            IIdMessageMatcher
+        ] = rf_api_client.request_folding_range(doc_uri)
+        if message_matcher is None:
+            log.debug("Message matcher for folding range returned None.")
+            return None
+
+        if wait_for_message_matcher(
+            message_matcher,
+            rf_api_client.request_cancel,
+            DEFAULT_COMPLETIONS_TIMEOUT,
+            monitor,
+        ):
+            msg = message_matcher.msg
+            if msg is not None:
+                result = msg.get("result")
+                if result:
+                    return result
+
+        return None
+
+    def m_text_document__code_lens(
+            self, *args,  **kwargs
+        ) -> Optional[list]:
+        """
+        "params": {
+            "textDocument": {
+                "uri": "file:///x%3A/vscode-robot/local_test/Basic/resources/keywords.robot"
+            }
+        },
+        """
+
+        doc_uri = kwargs["textDocument"]["uri"]       
+
+        rf_api_client = self._server_manager.get_regular_rf_api_client(doc_uri)
+        if rf_api_client is not None:
+            func = partial(self._code_lens, rf_api_client, doc_uri)
+            func = require_monitor(func)
+            return func
+
+        log.info("Unable to get folding range (no api available).")
+        return []
+
+    @log_and_silence_errors(log)
+    def _code_lens(
+        self,
+        rf_api_client: IRobotFrameworkApiClient,
+        doc_uri: str,       
+        monitor: Monitor,
+    ) -> Optional[dict]:
+        from robocorp_ls_core.client_base import wait_for_message_matcher
+     
+        ws = self.workspace
+        if not ws:
+            log.critical("Workspace must be set before getting hover.")
+            return None
+
+        document = ws.get_document(doc_uri, accept_from_file=True)
+        if document is None:
+            log.critical("Unable to find document (%s) for code lens." % (doc_uri,))
+            return None
+
+        # Asynchronous completion.
+        message_matcher: Optional[
+            IIdMessageMatcher
+        ] = rf_api_client.request_code_lens(doc_uri)
+        if message_matcher is None:
+            log.debug("Message matcher for code lens returned None.")
+            return None
+
+        if wait_for_message_matcher(
+            message_matcher,
+            rf_api_client.request_cancel,
+            DEFAULT_COMPLETIONS_TIMEOUT,
+            monitor,
+        ):
+            msg = message_matcher.msg
+            if msg is not None:
+                result = msg.get("result")
+                if result:
+                    return result
+
+        return None
+
+        

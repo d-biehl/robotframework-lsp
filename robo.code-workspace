@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "robotframework-ls"
+		},
+		{
+			"path": "robocorp-python-ls-core"
+		},
+		{
+			"path": "example-vscode"
+		},
+		{
+			"path": "..\\..\\..\\Users\\daniel\\.virtualenvs\\robotframework-ls-eIJxjzm1\\src\\robotframework"
+		}
+	],
+	"settings": {}
+}

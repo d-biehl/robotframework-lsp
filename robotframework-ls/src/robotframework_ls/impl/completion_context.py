@@ -36,9 +36,9 @@ class _Memo(object):
 
         return False
 
-    def complete_for_library(self, library_name):
+    def complete_for_library(self, library_name, library_alias, library_args):
         if library_name not in self._completed_libraries:
-            self._completed_libraries[library_name] = True
+            self._completed_libraries[(library_name, library_alias, library_args)] = True
             return True
 
         return False
@@ -334,7 +334,10 @@ class CompletionContext(object):
                         ):
                             check_paths.append(
                                 os.path.join(
-                                    additional_pythonpath_entry, name_with_resolved_vars
+                                    os.path.abspath(
+                                        os.path.join(os.path.normpath(uris.to_fs_path(ws.root_uri)), additional_pythonpath_entry)) \
+                                            if ws.root_uri is not None and not os.path.isabs(additional_pythonpath_entry) else additional_pythonpath_entry,
+                                    name_with_resolved_vars
                                 )
                             )
 

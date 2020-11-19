@@ -19,7 +19,7 @@
 https://github.com/microsoft/language-server-protocol/tree/gh-pages/_specifications
 https://microsoft.github.io/language-server-protocol/specification
 """
-from typing import List, Union
+from typing import Any, List, Optional, Union
 import typing
 
 from robocorp_ls_core.protocols import IEndPoint, IFuture
@@ -119,7 +119,8 @@ class _Base(object):
             if hasattr(value, "to_dict"):
                 value = value.to_dict()
             if value.__class__ in (list, tuple):
-                value = [v.to_dict() if hasattr(v, "to_dict") else v for v in value]
+                value = [v.to_dict() if hasattr(v, "to_dict")
+                         else v for v in value]
             if value is not None:
                 new_dict[key] = value
         return new_dict
@@ -300,7 +301,8 @@ class Position(_Base):
 
 class Range(_Base):
     def __init__(self, start, end):
-        self.start = Position(*start) if start.__class__ in (list, tuple) else start
+        self.start = Position(
+            *start) if start.__class__ in (list, tuple) else start
         self.end = Position(*end) if end.__class__ in (list, tuple) else end
 
     def __eq__(self, other):
@@ -330,15 +332,15 @@ class LocationLink(_Base):
             Span of the origin of this link.
             Used as the underlined span for mouse interaction. Defaults to the word range at
             the mouse position.
-            
+
         :param target_uri:
             The target resource identifier of this link.
-            
+
         :param target_range:
             The full target range of this link. If the target for example is a symbol then target range is the
             range enclosing this symbol not including leading/trailing whitespace but everything else
             like comments. This information is typically used to highlight the range in the editor.
-            
+
         :param target_selection_range:
             The range that should be selected and revealed when this link is being followed, e.g the name of a function.
             Must be contained by the the `targetRange`. See also `DocumentSymbol#range`
@@ -357,6 +359,45 @@ class Location(_Base):
         """
         self.uri = uri
         self.range = range
+
+
+class Hover(_Base):
+    def __init__(
+        self,
+        contents: Union[str, MarkupContent],
+        range: Optional[Range] = None,
+    ):
+        self.contents = contents
+        self.range = range
+
+
+class FoldingRangeKind:
+    Comment = "comment"
+    Imports = "imports"
+    Region = 'region'
+
+
+class FoldingRange(_Base):
+    def __init__(self, startLine, endLine, startCharacter=None, endCharacter=None, kind=None):
+        self.startLine = startLine
+        self.endLine = endLine
+        self.startCharacter = startCharacter
+        self.endCharacter = endCharacter
+        self.kind = kind
+
+
+class Command(_Base):
+    def __init__(self, title: str, command: str, arguments: Optional[list[any]] = None):
+        self.title = title
+        self.command = command
+        self.arguments = arguments
+
+
+class CodeLens(_Base):
+    def __init__(self, range: Range, command: Optional[Command] = None, data: Optional[Any] = None):
+        self.range = range
+        self.command = command
+        self.data = data
 
 
 class LSPMessages(object):

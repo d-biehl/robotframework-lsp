@@ -1,3 +1,4 @@
+import re
 from robocorp_ls_core.robotframework_log import get_logger
 from robotframework_ls.impl.protocols import ICompletionContext, IKeywordFound
 from typing import List
@@ -12,21 +13,29 @@ class _Collector(object):
             build_matchers_with_resource_or_library_scope,
         )
 
-        token_str = token.value
+        token_str = token.value if token is not None else None
 
         self.completion_items = []
         self.selection = selection
         self.token = token
 
-        self._matcher = RobotStringMatcher(token_str)
-        self._scope_matchers = build_matchers_with_resource_or_library_scope(token_str)
+        self._matcher = RobotStringMatcher(token_str) if token_str is not None else None
+
+        self._scope_matchers = build_matchers_with_resource_or_library_scope(token_str) if token_str is not None else []
 
     def accepts(self, keyword_name):
+        if any(x.label == keyword_name for x in self.completion_items):
+            return False
+
+        if self._matcher is None:
+            return True
+
         if self._matcher.accepts_keyword_name(keyword_name):
             return True
         for matcher in self._scope_matchers:
             if matcher.accepts_keyword_name(keyword_name):
                 return True
+            
         return False
 
     def _create_completion_item_from_keyword(
@@ -57,8 +66,8 @@ class _Collector(object):
 
         text_edit = TextEdit(
             Range(
-                start=Position(selection.line, token.col_offset + col_delta),
-                end=Position(selection.line, token.end_col_offset),
+                start=Position(selection.line, token.col_offset + col_delta if token is not None else selection.col),
+                end=Position(selection.line, token.end_col_offset if token is not None else selection.col),
             ),
             text,
         )
@@ -76,11 +85,12 @@ class _Collector(object):
                 if keyword_found.docs_format == "markdown"
                 else MarkupKind.PlainText
             ),
-        ).to_dict()
+        )
 
     def on_keyword(self, keyword_found):
         col_delta = 0
-        if not self._matcher.accepts_keyword_name(keyword_found.keyword_name):
+        
+        if self._matcher is not None and not self._matcher.accepts_keyword_name(keyword_found.keyword_name):
             for matcher in self._scope_matchers:
                 if matcher.accepts_keyword(keyword_found):
                     # +1 for the dot
@@ -102,11 +112,12 @@ def complete(completion_context: ICompletionContext) -> List[dict]:
 
     token_info = completion_context.get_current_token()
     if token_info is not None:
-        token = ast_utils.get_keyword_name_token(token_info.node, token_info.token)
-        if token is not None:
-            collector = _Collector(completion_context.sel, token)
+        keyword_token = ast_utils.get_keyword_name_token(token_info.node, token_info.token)
+        if keyword_token is not None:
+            collector = _Collector(completion_context.sel, keyword_token)
+                
             collect_keywords(completion_context, collector)
 
-            return collector.completion_items
+            return list([x.to_dict() for x in collector.completion_items])
 
     return []

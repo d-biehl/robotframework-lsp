@@ -268,6 +268,26 @@ class IRobotFrameworkApiClient(ILanguageServerClientBase, Protocol):
         :Note: async complete.
         """
 
+    def request_hover(
+        self, doc_uri: str, line: int, col: int
+    ) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+    def request_folding_range(
+        self, doc_uri: str
+    ) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+    def request_code_lens(
+        self, doc_uri: str
+    ) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+
+
 
 class ILanguageServerClient(ILanguageServerClientBase, Protocol):
     pid: Optional[int]

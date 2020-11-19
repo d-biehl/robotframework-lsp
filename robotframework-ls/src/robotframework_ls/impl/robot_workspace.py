@@ -16,6 +16,8 @@ class RobotWorkspace(Workspace):
         self.libspec_manager = libspec_manager
 
         Workspace.__init__(self, root_uri, workspace_folders=workspace_folders)
+        if self.libspec_manager is not None:
+            self.libspec_manager.root_uri = root_uri
         self._generate_ast = generate_ast
 
     @overrides(Workspace.add_folder)

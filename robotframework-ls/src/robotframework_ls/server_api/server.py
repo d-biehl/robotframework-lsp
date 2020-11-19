@@ -24,7 +24,8 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             try:
                 libspec_manager = LibspecManager()
             except:
-                log.exception("Unable to properly initialize the LibspecManager.")
+                log.exception(
+                    "Unable to properly initialize the LibspecManager.")
                 raise
 
         self.libspec_manager = libspec_manager
@@ -64,7 +65,8 @@ class RobotFrameworkServerApi(PythonLanguageServer):
 
     @overrides(PythonLanguageServer.m_workspace__did_change_configuration)
     def m_workspace__did_change_configuration(self, **kwargs):
-        PythonLanguageServer.m_workspace__did_change_configuration(self, **kwargs)
+        PythonLanguageServer.m_workspace__did_change_configuration(
+            self, **kwargs)
         self.libspec_manager.config = self.config
 
     @overrides(PythonLanguageServer.lint)
@@ -108,7 +110,8 @@ class RobotFrameworkServerApi(PythonLanguageServer):
 
             log.debug("Lint: starting (in thread).")
 
-            completion_context = self._create_completion_context(doc_uri, 0, 0, monitor)
+            completion_context = self._create_completion_context(
+                doc_uri, 0, 0, monitor)
             if completion_context is None:
                 return []
 
@@ -117,8 +120,10 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             errors = collect_errors(ast)
             log.debug("Collected AST errors (in thread): %s", len(errors))
             monitor.check_cancelled()
-            analysis_errors = code_analysis.collect_analysis_errors(completion_context)
-            log.debug("Collected analysis errors (in thread): %s", len(analysis_errors))
+            analysis_errors = code_analysis.collect_analysis_errors(
+                completion_context)
+            log.debug("Collected analysis errors (in thread): %s",
+                      len(analysis_errors))
             errors.extend(analysis_errors)
             return [error.to_lsp_diagnostic() for error in errors]
         except JsonRpcRequestCancelled:
@@ -147,7 +152,8 @@ class RobotFrameworkServerApi(PythonLanguageServer):
 
         ret = section_name_completions.complete(completion_context)
         if not ret:
-            ret.extend(filesystem_section_completions.complete(completion_context))
+            ret.extend(filesystem_section_completions.complete(
+                completion_context))
 
         if not ret:
             ret.extend(keyword_completions.complete(completion_context))
@@ -156,14 +162,16 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             ret.extend(variable_completions.complete(completion_context))
 
         if not ret:
-            ret.extend(keyword_parameter_completions.complete(completion_context))
+            ret.extend(keyword_parameter_completions.complete(
+                completion_context))
 
         return ret
 
     def m_section_name_complete(self, doc_uri, line, col):
         from robotframework_ls.impl import section_name_completions
 
-        completion_context = self._create_completion_context(doc_uri, line, col, None)
+        completion_context = self._create_completion_context(
+            doc_uri, line, col, None)
         if completion_context is None:
             return []
 
@@ -172,7 +180,8 @@ class RobotFrameworkServerApi(PythonLanguageServer):
     def m_keyword_complete(self, doc_uri, line, col):
         from robotframework_ls.impl import keyword_completions
 
-        completion_context = self._create_completion_context(doc_uri, line, col, None)
+        completion_context = self._create_completion_context(
+            doc_uri, line, col, None)
         if completion_context is None:
             return []
         return keyword_completions.complete(completion_context)
@@ -298,6 +307,60 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             return None
 
         return signature_help(completion_context)
+
+    def m_hover(self, doc_uri: str, line: int, col: int):
+        func = partial(self._threaded_hover, doc_uri, line, col)
+        func = require_monitor(func)
+        return func
+
+    def _threaded_hover(
+        self, doc_uri: str, line: int, col: int, monitor: IMonitor
+    ) -> Optional[dict]:
+        from robotframework_ls.impl.hover import hover
+
+        completion_context = self._create_completion_context(
+            doc_uri, line, col, monitor
+        )
+        if completion_context is None:
+            return None
+
+        return hover(completion_context)
+
+    def m_folding_range(self, doc_uri: str):
+        func = partial(self._threaded_folding_range, doc_uri)
+        func = require_monitor(func)
+        return func
+
+    def _threaded_folding_range(
+        self, doc_uri: str, monitor: IMonitor
+    ) -> Optional[dict]:
+        from robotframework_ls.impl.folding_range import folding_range
+
+        completion_context = self._create_completion_context(
+            doc_uri, 0, 0, monitor
+        )
+        if completion_context is None:
+            return None
+
+        return folding_range(completion_context)
+
+    def m_code_lens(self, doc_uri: str):
+        func = partial(self._threaded_code_lens, doc_uri)
+        func = require_monitor(func)
+        return func
+
+    def _threaded_code_lens(
+        self, doc_uri: str, monitor: IMonitor
+    ) -> Optional[dict]:
+        from robotframework_ls.impl.code_lens import code_lens
+
+        completion_context = self._create_completion_context(
+            doc_uri, 0, 0, monitor
+        )
+        if completion_context is None:
+            return None
+
+        return code_lens(completion_context, doc_uri)
 
     def m_shutdown(self, **_kwargs):
         PythonLanguageServer.m_shutdown(self, **_kwargs)

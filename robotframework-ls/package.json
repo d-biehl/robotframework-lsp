@@ -126,6 +126,28 @@
                 "when": "editorTextFocus && editorLangId == robotframework && !editorHasSelection && !inSnippetMode && !suggestWidgetVisible && config.robot.editor.4spacesTab"
             }
         ],
+        "commands": [
+            {
+                "command": "robot.runTestcase",
+                "title": "Run Testcase",
+                "category": "Robot"
+            },
+            {
+                "command": "robot.debugTestcase",
+                "title": "Debug Testcase",
+                "category": "Robot"
+            },
+            {
+                "command": "robot.runTestsuite",
+                "title": "Run Testsuite",
+                "category": "Robot"
+            },
+            {
+                "command": "robot.debugTestsuite",
+                "title": "Debug Testsuite",
+                "category": "Robot"
+            }
+        ],
         "breakpoints": [
             {
                 "language": "robotframework"

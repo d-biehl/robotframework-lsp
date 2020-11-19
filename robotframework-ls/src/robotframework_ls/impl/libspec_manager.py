@@ -1,8 +1,13 @@
 import os
+from os.path import join
 import sys
+from sys import path
 from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
 import threading
+import urllib
+
+from robotframework_ls.impl.protocols import ILibspecManager
 
 log = get_logger(__name__)
 
@@ -59,6 +64,8 @@ def _load_lib_info(canonical_spec_filename, can_regenerate):
 
 
 _IS_BUILTIN = "is_builtin"
+_ARGUMENTS = "arguments"
+_ALIAS = "alias"
 _SOURCE_TO_MTIME = "source_to_mtime"
 _UNABLE_TO_LOAD = "unable_to_load"
 
@@ -89,9 +96,9 @@ def _create_updated_source_to_mtime(library_doc):
     return source_to_mtime
 
 
-def _create_additional_info(spec_filename, is_builtin, obtain_mutex=True):
+def _create_additional_info(spec_filename, is_builtin, obtain_mutex=True, arguments=None, alias=None):
     try:
-        additional_info = {_IS_BUILTIN: is_builtin}
+        additional_info = {_IS_BUILTIN: is_builtin, _ARGUMENTS: arguments, _ALIAS:alias}
         if is_builtin:
             # For builtins we don't have to check the mtime
             # (on a new version we update the folder).
@@ -126,14 +133,13 @@ def _load_spec_filename_additional_info(spec_filename):
         additional_info_filename = _get_additional_info_filename(spec_filename)
 
         with open(additional_info_filename, "r") as stream:
-            source_to_mtime = json.load(stream)
-        return source_to_mtime
+            return json.load(stream)        
     except:
-        log.exception("Unable to load source mtimes from: %s", additional_info_filename)
+        log.exception("Unable to load source mtimes from: %s", spec_filename)
         return {}
 
 
-def _dump_spec_filename_additional_info(spec_filename, is_builtin, obtain_mutex=True):
+def _dump_spec_filename_additional_info(spec_filename, is_builtin, obtain_mutex=True, arguments=None, alias=None):
     """
     Creates a filename with additional information not directly available in the
     spec.
@@ -141,7 +147,7 @@ def _dump_spec_filename_additional_info(spec_filename, is_builtin, obtain_mutex=
     import json
 
     source_to_mtime = _create_additional_info(
-        spec_filename, is_builtin, obtain_mutex=obtain_mutex
+        spec_filename, is_builtin, obtain_mutex=obtain_mutex, arguments=arguments, alias=alias
     )
     additional_info_filename = _get_additional_info_filename(spec_filename)
     with open(additional_info_filename, "w") as stream:
@@ -179,8 +185,21 @@ class _LibInfo(object):
         self._canonical_spec_filename = spec_filename
         self._additional_info = None
         self._invalid = False
+    
+    @property
+    def additional_info(self):        
+        if self._additional_info is None:           
+                self._additional_info = _load_spec_filename_additional_info(self._canonical_spec_filename)            
+        return self._additional_info
 
-    def verify_sources_sync(self):
+    @property
+    def alias(self):
+        return self.additional_info.get(_ALIAS, None)
+    
+    def arguments(self):
+        return tuple(self.additional_info.get(_ARGUMENTS, []) or [])
+
+    def verify_sources_sync(self, arguments, alias):
         """
         :return bool:
             True if everything is ok and this library info can be used. Otherwise,
@@ -194,11 +213,8 @@ class _LibInfo(object):
         if self._invalid:  # Once invalid, always invalid.
             return False
 
-        additional_info = self._additional_info
-        if additional_info is None:
-            additional_info = _load_spec_filename_additional_info(
-                self._canonical_spec_filename
-            )
+        additional_info = self.additional_info
+        if additional_info is None:            
             if additional_info.get(_IS_BUILTIN, False):
                 return True
 
@@ -214,6 +230,15 @@ class _LibInfo(object):
                     % (self.library_doc.name, source_to_mtime, updated_source_to_mtime)
                 )
                 self._invalid = True
+                return False                        
+            
+            try:
+                if tuple(additional_info.get(_ARGUMENTS, []) or []) != (arguments or ()):
+                    return False
+            except:
+                pass
+
+            if additional_info.get(_ALIAS, None) != alias:
                 return False
 
         return True
@@ -327,7 +352,7 @@ class _FolderInfo(object):
         return new_libspec_filename_to_info
 
 
-class LibspecManager(object):
+class LibspecManager(ILibspecManager):
     """
     Used to manage the libspec files.
     
@@ -405,6 +430,8 @@ class LibspecManager(object):
             self._on_spec_file_changed, timeout=0.5
         )
 
+        self._root_uri = None
+
         self._libspec_dir = self.get_internal_libspec_dir()
 
         self._user_libspec_dir = user_libspec_dir or os.path.join(
@@ -468,6 +495,14 @@ class LibspecManager(object):
             )
 
     @property
+    def root_uri(self):
+        return self._root_uri
+
+    @root_uri.setter    
+    def root_uri(self, value):
+        self._root_uri = value
+
+    @property
     def config(self):
         return self._config
 
@@ -528,10 +563,16 @@ class LibspecManager(object):
 
     def add_additional_pythonpath_folder(self, folder_path):
         self._check_in_main_thread()
+        
+        from robocorp_ls_core import uris
+
         if folder_path not in self._additional_pythonpath_folder_to_folder_info:
             log.debug("Added additional pythonpath folder: %s", folder_path)
             cp = self._additional_pythonpath_folder_to_folder_info.copy()
-            folder_info = cp[folder_path] = _FolderInfo(folder_path, recursive=True)
+                        
+            real_path = os.path.abspath(os.path.join(os.path.normpath(uris.to_fs_path(self.root_uri)), folder_path)) if self.root_uri is not None and not os.path.isabs(folder_path) else folder_path
+            
+            folder_info = cp[folder_path] = _FolderInfo(real_path, recursive=True)
             self._additional_pythonpath_folder_to_folder_info = cp
             folder_info.start_watch(self._observer, self._spec_changes_notifier)
             folder_info.synchronize()
@@ -693,6 +734,8 @@ class LibspecManager(object):
         cwd=None,
         additional_path=None,
         is_builtin=False,
+        arguments = None,
+        alias = None
     ):
         """
         :param str libname:
@@ -720,18 +763,30 @@ class LibspecManager(object):
                         call.extend(["-P", additional_path])
 
                 additional_pythonpath_entries = list(
-                    self._additional_pythonpath_folder_to_folder_info.keys()
+                    [x.folder_path for x in self._additional_pythonpath_folder_to_folder_info.values()]
                 )
                 for entry in list(additional_pythonpath_entries):
                     if os.path.exists(entry):
                         call.extend(["-P", entry])
+                
+                libargs = "::".join(arguments) if arguments is not None and len(arguments)>0 else None
+                if libargs is not None:
+                    call.append(f"{libname}::{libargs}")
+                else:
+                    call.append(libname)
 
-                call.append(libname)
                 libspec_dir = self._user_libspec_dir
                 if libname in robot_constants.STDLIBS:
                     libspec_dir = self._builtins_libspec_dir
 
-                libspec_filename = os.path.join(libspec_dir, libname + ".libspec")
+                encoded_libname = libname;                
+                if libargs is not None:
+                    encoded_libname += f"::{libargs}"
+
+                if alias is not None:
+                    encoded_libname += f"@{alias}"
+                                
+                libspec_filename = os.path.join(libspec_dir, urllib.parse.quote(encoded_libname) + ".libspec")
 
                 log.debug(f"Obtaining mutex to generate libpsec: {libspec_filename}.")
                 with timed_acquire_mutex(
@@ -774,6 +829,7 @@ class LibspecManager(object):
                                         libspec_filename,
                                         is_builtin=is_builtin,
                                         obtain_mutex=False,
+                                        arguments=arguments, alias=alias
                                     )
                                     return True
                             except:
@@ -788,7 +844,7 @@ class LibspecManager(object):
                         )
                         return False
                     _dump_spec_filename_additional_info(
-                        libspec_filename, is_builtin=is_builtin, obtain_mutex=False
+                        libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias
                     )
                     return True
             except Exception:
@@ -803,7 +859,7 @@ class LibspecManager(object):
         self._observer.dispose()
         self._spec_changes_notifier.dispose()
 
-    def _do_create_libspec_on_get(self, libname, current_doc_uri):
+    def _do_create_libspec_on_get(self, libname, current_doc_uri, arguments, alias):
         from robocorp_ls_core import uris
 
         additional_path = None
@@ -828,12 +884,12 @@ class LibspecManager(object):
             if libname.lower().endswith((".py", ".class", ".java")):
                 libname = os.path.splitext(libname)[0]
 
-        if self._create_libspec(libname, additional_path=additional_path, cwd=cwd):
+        if self._create_libspec(libname, additional_path=additional_path, cwd=cwd, arguments=arguments, alias=alias):
             self.synchronize_internal_libspec_folders()
             return True
         return False
 
-    def get_library_info(self, libname, create=True, current_doc_uri=None):
+    def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=None, alias=None):
         """
         :param libname:
             It may be a library name, a relative path to a .py file or an
@@ -841,6 +897,9 @@ class LibspecManager(object):
 
         :rtype: LibraryDoc
         """
+        if libname is None:
+            return None
+            
         libname_lower = libname.lower()
         if libname_lower.endswith((".py", ".class", ".java")):
             libname_lower = os.path.splitext(libname_lower)[0]
@@ -850,18 +909,19 @@ class LibspecManager(object):
 
         for lib_info in self._iter_lib_info():
             library_doc = lib_info.library_doc
-            if library_doc.name and library_doc.name.lower() == libname_lower:
-                if not lib_info.verify_sources_sync():
+            if library_doc.name and library_doc.name.lower() == libname_lower and lib_info.alias == alias:
+                if not lib_info.verify_sources_sync(arguments, alias):
                     if create:
                         # Found but it's not in sync. Try to regenerate (don't proceed
                         # because we don't want to match a lower priority item, so,
                         # regenerate and get from the cache without creating).
-                        self._do_create_libspec_on_get(libname, current_doc_uri)
+                        self._do_create_libspec_on_get(libname, current_doc_uri, arguments, alias)
 
                         # Note: get even if it if was not created (we may match
                         # a lower priority library).
                         return self.get_library_info(
-                            libname, create=False, current_doc_uri=current_doc_uri
+                            libname, create=False, current_doc_uri=current_doc_uri,
+                            arguments=arguments, alias=alias
                         )
                     else:
                         # Not in sync and it should not be created, just skip it.
@@ -870,9 +930,10 @@ class LibspecManager(object):
                     return library_doc
 
         if create:
-            if self._do_create_libspec_on_get(libname, current_doc_uri):
+            if self._do_create_libspec_on_get(libname, current_doc_uri, arguments, alias):
                 return self.get_library_info(
-                    libname, create=False, current_doc_uri=current_doc_uri
+                    libname, create=False, current_doc_uri=current_doc_uri, 
+                    arguments=arguments, alias=alias
                 )
 
         log.debug("Unable to find library named: %s", libname)

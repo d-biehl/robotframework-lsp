@@ -133,7 +133,10 @@ class _FindDefinitionKeywordCollector(IDefinitionsCollector):
         return True
 
     def on_keyword(self, keyword_found):
-        if self._matcher.is_keyword_name_match(keyword_found.keyword_name):
+        if any(x.keyword_name == keyword_found.keyword_name for x in self.matches):
+           return
+
+        if self._matcher.is_keyword_name_match(keyword_found.keyword_name):               
             definition = _DefinitionFromKeyword(keyword_found)
             self.matches.append(definition)
             return
@@ -204,7 +207,9 @@ def find_definition(completion_context: ICompletionContext) -> Sequence[IDefinit
             libspec_manager = completion_context.workspace.libspec_manager
             completion_context.check_cancelled()
             library_doc = libspec_manager.get_library_info(
-                token.value, create=True, current_doc_uri=completion_context.doc.uri
+                token.value, create=True, current_doc_uri=completion_context.doc.uri,
+                arguments=token_info.node.args, alias=token_info.node.alias
+                
             )
             if library_doc is not None:
                 definition = _DefinitionFromLibrary(library_doc)

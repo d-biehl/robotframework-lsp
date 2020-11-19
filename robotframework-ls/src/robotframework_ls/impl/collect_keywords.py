@@ -248,7 +248,7 @@ def _collect_current_doc_keywords(completion_context, collector):
     _collect_completions_from_ast(ast, completion_context, collector)
 
 
-_LibInfo = namedtuple("_LibInfo", "name, alias")
+_LibInfo = namedtuple("_LibInfo", "name, alias, args")
 
 
 def _collect_libraries_keywords(completion_context, collector):
@@ -260,17 +260,18 @@ def _collect_libraries_keywords(completion_context, collector):
     from robocorp_ls_core.lsp import CompletionItemKind
 
     libraries = completion_context.get_imported_libraries()
-    library_infos = set(_LibInfo(library.name, library.alias) for library in libraries)
-    library_infos.add(_LibInfo(BUILTIN_LIB, None))
+    library_infos = set(_LibInfo(library.name, library.alias, library.args) for library in libraries)
+    library_infos.add(_LibInfo(BUILTIN_LIB, None, None))
     libspec_manager = completion_context.workspace.libspec_manager
 
-    for library_info in library_infos:
+    for library_info in library_infos:        
         completion_context.check_cancelled()
-        if not completion_context.memo.complete_for_library(library_info.name):
+        if not completion_context.memo.complete_for_library(library_info.name, library_info.alias, library_info.args):
             continue
-
+        
         library_doc = libspec_manager.get_library_info(
-            library_info.name, create=True, current_doc_uri=completion_context.doc.uri
+            library_info.name, create=True, current_doc_uri=completion_context.doc.uri,
+            arguments=library_info.args, alias=library_info.alias
         )
         if library_doc is not None:
             #: :type keyword: KeywordDoc

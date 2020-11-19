@@ -326,9 +326,9 @@ class Endpoint(object):
             # Remove the future from the client requests map
             self._client_request_futures.pop(request_id, None)
 
-            try:
-                message = {"jsonrpc": JSONRPC_VERSION, "id": request_id}
+            message = {"jsonrpc": JSONRPC_VERSION, "id": request_id}
 
+            try:
                 if future.cancelled():
                     raise JsonRpcRequestCancelled()
 

@@ -251,31 +251,22 @@
             "end": "^(?=\\*)",
             "patterns": [
                 {
-                    "include": "#function_declaration"
-                },
-                {
-                    "include": "#function_documentation"
-                },
-                {
                     "include": "#escape"
                 },
                 {
                     "include": "#comment"
                 },
                 {
+                    "include": "#function_declaration"
+                },
+                {
+                    "include": "#function_documentation"
+                },
+                {
                     "include": "#returning_keyword_call"
                 },
                 {
-                    "include": "#for_loop"
-                },
-                {
-                    "include": "#ELSE_IF"
-                },
-                {
-                    "include": "#ELSE"
-                },
-                {
-                    "include": "#run_keyword_if"
+                    "include": "#control_keywords"
                 },
                 {
                     "include": "#line_continuation"
@@ -317,31 +308,22 @@
             "end": "^(?=\\*)",
             "patterns": [
                 {
-                    "include": "#function_declaration"
-                },
-                {
-                    "include": "#function_documentation"
-                },
-                {
                     "include": "#escape"
                 },
                 {
                     "include": "#comment"
                 },
                 {
-                    "include": "#for_loop"
+                    "include": "#function_declaration"
+                },
+                {
+                    "include": "#function_documentation"
                 },
                 {
                     "include": "#returning_keyword_call"
                 },
                 {
-                    "include": "#ELSE_IF"
-                },
-                {
-                    "include": "#ELSE"
-                },
-                {
-                    "include": "#run_keyword_if"
+                    "include": "#control_keywords"
                 },
                 {
                     "include": "#line_continuation"
@@ -456,27 +438,12 @@
             ],
             "name": "meta.runkeywordif.robot"
         },
-        "ELSE_IF": {
-            "end": "(?:  | ?\\t| ?$)",
-            "begin": "(?m)(?:(^\\s*\\.\\.\\.(?: {2,}| ?\\t))|(?: {2,}| ?\\t))(ELSE IF)(?:(?:(?: {2,})|(?: ?\\t)|(\\s*\\.\\.\\.\\s))+(.*?))?(?:(?:(?: {2,})|(?: ?\\t)|(\\s*\\.\\.\\.\\s))+(.*?))?(?:  | ?\\t| ?$)+",
+        "FOR": {
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "begin": "^(?i)(?:\\s)+(FOR)",
             "beginCaptures": {
                 "1": {
-                    "name": "keyword.operator.robot"
-                },
-                "2": {
                     "name": "keyword.control.robot"
-                },
-                "3": {
-                    "name": "keyword.operator.robot"
-                },
-                "4": {
-                    "name": "string.interpolated.robot"
-                },
-                "5": {
-                    "name": "keyword.operator.robot"
-                },
-                "6": {
-                    "name": "meta.support.function.robot"
                 }
             },
             "contentName": "string.quoted.single.robot",
@@ -491,26 +458,48 @@
                     "include": "#variables"
                 },
                 {
+                    "include": "#for_operator"
+                },
+                {
                     "include": "#line_continuation"
                 }
             ],
-            "name": "meta.else.if.robot"
+            "name": "meta.end.robot"
         },
-        "ELSE": {
-            "end": "(?:  | ?\\t| ?$)",
-            "begin": "(?m)(?:(^\\s*\\.\\.\\.(?: {2,}| ?\\t))|(?: {2,}| ?\\t))(ELSE)(?:(?:(?: {2,})|(?: ?\\t)|(\\s*\\.\\.\\.\\s))+(.*?))?(?:  | ?\\t| ?$)+",
+        "for_operator": {
+            "begin": "(?<=\\s)(IN ENUMERATE|IN RANGE|IN ZIP|IN)",
             "beginCaptures": {
                 "1": {
-                    "name": "keyword.operator.robot"
-                },
-                "2": {
                     "name": "keyword.control.robot"
+                }
+            },
+            "contentName": "string.quoted.single.robot",
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "patterns": [
+                {
+                    "include": "#variables"
                 },
-                "3": {
-                    "name": "keyword.operator.robot"
+                {
+                    "include": "#named_argument"
                 },
-                "4": {
-                    "name": "meta.support.function.robot"
+                {
+                    "include": "#line_continuation"
+                },
+                {
+                    "include": "#escape"
+                },
+                {
+                    "include": "#comment"
+                }
+            ],
+            "name": "meta.for.header.operator.robot"
+        },
+        "IF": {
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "begin": "^(?i)(?:\\s)+(IF)",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.robot"
                 }
             },
             "contentName": "string.quoted.single.robot",
@@ -528,7 +517,98 @@
                     "include": "#line_continuation"
                 }
             ],
-            "name": "meta.else.robot"
+            "name": "meta.if.robot"
+        },  
+        "ELSE": {
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "begin": "^(?i)(?:\\s)+(ELSE)",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.robot"
+                }
+            },
+            "contentName": "string.quoted.single.robot",
+            "patterns": [
+                {
+                    "include": "#escape"
+                },
+                {
+                    "include": "#comment"
+                },                
+                {
+                    "include": "#line_continuation"
+                }
+            ],
+            "name": "meta.else_if.robot"
+        },              
+        "ELSE_IF": {
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "begin": "^(?i)(?:\\s)+(ELSE IF)",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.robot"
+                }
+            },
+            "contentName": "string.quoted.single.robot",
+            "patterns": [
+                {
+                    "include": "#escape"
+                },
+                {
+                    "include": "#comment"
+                },
+                {
+                    "include": "#variables"
+                },
+                {
+                    "include": "#line_continuation"
+                }
+            ],
+            "name": "meta.else_if.robot"
+        },
+        "END": {
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "begin": "^(?i)(?:\\s)+(END)",
+            "beginCaptures": {
+                "1": {
+                    "name": "keyword.control.robot"
+                }
+            },
+            "contentName": "string.quoted.single.robot",
+            "patterns": [
+                {
+                    "include": "#escape"
+                },
+                {
+                    "include": "#comment"
+                },
+                {
+                    "include": "#line_continuation"
+                }
+            ],
+            "name": "meta.end.robot"
+        },       
+        "control_keywords": {
+            "patterns": [
+                {
+                    "include": "#run_keyword_if"
+                },                
+                {
+                    "include": "#ELSE_IF"
+                },
+                {
+                    "include": "#ELSE"
+                },             
+                {
+                    "include": "#IF"
+                },
+                {
+                    "include": "#FOR"
+                },
+                {
+                    "include": "#END"
+                }
+            ]
         },
         "function_declaration": {
             "begin": "^(?=[^\\t\\*\\n\\|#])(?!  )",
@@ -787,90 +867,6 @@
             },
             "name": "meta.escape.robot"
         },
-        "for_loop": {
-            "begin": "^(?=(?: {2,}| ?\\t ?)+(?:FOR))",
-            "contentName": "meta.keyword.control.robot",
-            "end": "^(?: {2,}| ?\\t ?)(END)",
-            "patterns": [
-                {
-                    "include": "#for_header"
-                },
-                {
-                    "include": "#keyword_call"
-                },
-                {
-                    "include": "#returning_keyword_call"
-                },
-                {
-                    "include": "#escape"
-                },
-                {
-                    "include": "#comment"
-                }
-            ],
-            "name": "meta.for.loop.robot",
-            "endCaptures": {
-                "1": {
-                    "name": "keyword.control.robot"
-                }
-            }
-        },
-        "for_header": {
-            "begin": "^(?: {2,}| ?\\t ?)+(FOR)",
-            "beginCaptures": {
-                "1": {
-                    "name": "keyword.control.flow.robot"
-                }
-            },
-            "contentName": "meta.keyword.control.robot",
-            "end": "^(?!\\s*\\.\\.\\.)",
-            "patterns": [
-                {
-                    "include": "#for_operator"
-                },
-                {
-                    "include": "#parameter"
-                },
-                {
-                    "include": "#line_continuation"
-                },
-                {
-                    "include": "#escape"
-                },
-                {
-                    "include": "#comment"
-                }
-            ],
-            "name": "meta.for.header.robot"
-        },
-        "for_operator": {
-            "begin": "(?<=\\s)(IN ENUMERATE|IN RANGE|IN ZIP|IN)",
-            "beginCaptures": {
-                "1": {
-                    "name": "keyword.control.robot"
-                }
-            },
-            "contentName": "string.quoted.single.robot",
-            "end": "^(?!\\s*\\.\\.\\.)",
-            "patterns": [
-                {
-                    "include": "#variables"
-                },
-                {
-                    "include": "#named_argument"
-                },
-                {
-                    "include": "#line_continuation"
-                },
-                {
-                    "include": "#escape"
-                },
-                {
-                    "include": "#comment"
-                }
-            ],
-            "name": "meta.for.header.operator.robot"
-        },
         "keyword_call": {
             "end": "^(?!\\s*\\.\\.\\.)",
             "begin": "^(?!(?: {2,}| ?\\t ?)+(?:(?=[$\\[@&%]|\\.)))(?: {2,}| ?\\t ?)+(.*?)(?= {2,}| ?\\t ?| ?$)",
@@ -994,7 +990,7 @@
             "name": "meta.returning.keyword.robot",
             "begin": "(?<=\\s)(?=\\s*(?:(?=[$@&])))((?:\\s)*(?:[$&@]{(?:.*?)}(?:\\[.*?\\])?(?: ?=?\\s*))*)(.*?)(?: {2,}| ?\\t ?|$)",
             "beginCaptures": {
-                "1":{
+                "1": {
                     "name": "variable.parameter.robot",
                     "patterns": [
                         {
@@ -1025,7 +1021,6 @@
                     "include": "#comment"
                 }
             ]
-                
         },
         "variable_assignment_from_kw": {
             "name": "meta.variable.assignment.keyword.robot",

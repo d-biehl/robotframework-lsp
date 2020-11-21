@@ -387,7 +387,7 @@ class FoldingRange(_Base):
 
 
 class Command(_Base):
-    def __init__(self, title: str, command: str, arguments: Optional[list[any]] = None):
+    def __init__(self, title: str, command: str, arguments: Optional[List[Any]] = None):
         self.title = title
         self.command = command
         self.arguments = arguments

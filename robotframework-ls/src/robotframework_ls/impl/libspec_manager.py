@@ -1,7 +1,5 @@
 import os
-from os.path import join
 import sys
-from sys import path
 from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
 import threading
@@ -430,6 +428,7 @@ class LibspecManager(ILibspecManager):
         :param __internal_libspec_dir__:
             Only to be used in tests (to regenerate the builtins)!
         """
+
         from robocorp_ls_core import watchdog_wrapper
 
         self._main_thread = threading.current_thread()
@@ -923,6 +922,7 @@ class LibspecManager(ILibspecManager):
 
         :rtype: LibraryDoc
         """
+
         if libname is None:
             return None
 

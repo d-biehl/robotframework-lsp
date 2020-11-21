@@ -169,7 +169,7 @@ class _KeywordsCollector(object):
         return multi
 
 
-def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token, message: str):
+def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token, message: str) -> Error:
     if not end_token:
         end_token = start_token
 
@@ -180,7 +180,7 @@ def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token,
                       end_token.end_col_offset) if end_token else (-1, -1))
 
 
-def create_error_from_statements(start_statement: statements.Statement, end_statement: statements.Statement, message: str):
+def create_error_from_statements(start_statement: statements.Statement, end_statement: statements.Statement, message: str) -> Error:
     start = next((t for t in start_statement.tokens if t.type not in tokens.Token.NON_DATA_TOKENS),
                  start_statement.tokens[0]) if start_statement is not None else None
 
@@ -398,7 +398,10 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         self.generic_visit(node)
 
     def visit_KeywordCall(self, node: statements.KeywordCall):
-        pass
+        if node.keyword and node.keyword.lower() in ["end", "if", "else if", "for"]:
+            self.append_error(node.get_token(tokens.Token.KEYWORD)
+                              or node, f"'{node.keyword}' is a reserverd keyword.")
+        self.generic_visit(node)
 
 
 class ErrorVisitor(blocks.ModelVisitor):
@@ -420,11 +423,16 @@ class ErrorVisitor(blocks.ModelVisitor):
 
 
 def collect_analysis_errors(completion_context: ICompletionContext):
+    import time
+
+    start = time.time()
 
     errors = []
     collector = _KeywordsCollector()
     collect_keywords(completion_context, collector)
+    log.info(f"collect kw {time.time() - start}")
 
+    start = time.time()
     ast = completion_context.get_ast()
     for keyword_usage_info in ast_utils.iter_keyword_usage_tokens(ast):
         completion_context.check_cancelled()
@@ -460,7 +468,11 @@ def collect_analysis_errors(completion_context: ICompletionContext):
             # i.e.: Collect at most 100 errors
             break
 
+    log.info(f"kw completion {time.time() - start}")
+
+    start = time.time()
     #errors += ErrorVisitor.find_from(ast)
     errors += CodeAnalysisVisitor.find_from(completion_context)
+    log.info(f"visitor {time.time() - start}")
 
     return errors

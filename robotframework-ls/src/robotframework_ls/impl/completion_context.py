@@ -1,9 +1,9 @@
 from robocorp_ls_core.cache import instance_cache
-from robocorp_ls_core.constants import NULL
+from robocorp_ls_core.constants import NULL, Null
 from robocorp_ls_core.protocols import IMonitor, Sentinel, IConfig, IDocumentSelection
 from robocorp_ls_core.robotframework_log import get_logger
 from robotframework_ls.impl.robot_workspace import RobotDocument
-from typing import Optional, Any, List
+from typing import Union, Optional, Any, List
 from robotframework_ls.impl.protocols import (
     IRobotDocument,
     ICompletionContext,
@@ -38,13 +38,14 @@ class _Memo(object):
 
     def complete_for_library(self, library_name, library_alias, library_args):
         if library_name not in self._completed_libraries:
-            self._completed_libraries[(library_name, library_alias, library_args)] = True
+            self._completed_libraries[(
+                library_name, library_alias, library_args)] = True
             return True
 
         return False
 
 
-class CompletionContext(object):
+class CompletionContext(ICompletionContext):
 
     TYPE_TEST_CASE = RobotDocument.TYPE_TEST_CASE
     TYPE_INIT = RobotDocument.TYPE_INIT
@@ -58,7 +59,7 @@ class CompletionContext(object):
         workspace=None,
         config=None,
         memo=None,
-        monitor: IMonitor = NULL,
+        monitor: Union[IMonitor, Null] = NULL,
     ) -> None:
         """
         :param robocorp_ls_core.workspace.Document doc:
@@ -68,7 +69,6 @@ class CompletionContext(object):
         :param robocorp_ls_core.config.Config config:
         :param _Memo memo:
         """
-
         if col is Sentinel.SENTINEL or line is Sentinel.SENTINEL:
             assert col is Sentinel.SENTINEL, (
                 "Either line and col are not set, or both are set. Found: (%s, %s)"
@@ -95,7 +95,7 @@ class CompletionContext(object):
         self._monitor = monitor or NULL
 
     @property
-    def monitor(self) -> IMonitor:
+    def monitor(self) -> Union[IMonitor, Null]:
         return self._monitor
 
     def check_cancelled(self) -> None:
@@ -286,7 +286,7 @@ class CompletionContext(object):
 
         try:
             tokenized_vars = ast_utils.tokenize_variables(token)
-        except:
+        except Exception:
             return token.value  # Unable to tokenize
         parts = []
         for v in tokenized_vars:
@@ -317,14 +317,16 @@ class CompletionContext(object):
         for token in resource_import.tokens:
             if token.type == token.NAME:
 
-                name_with_resolved_vars = self.token_value_resolving_variables(token)
+                name_with_resolved_vars = self.token_value_resolving_variables(
+                    token)
 
                 if not os.path.isabs(name_with_resolved_vars):
                     # It's a relative resource, resolve its location based on the
                     # current file.
                     check_paths = [
                         os.path.join(
-                            os.path.dirname(self.doc.path), name_with_resolved_vars
+                            os.path.dirname(
+                                self.doc.path), name_with_resolved_vars
                         )
                     ]
                     config = self.config
@@ -335,8 +337,8 @@ class CompletionContext(object):
                             check_paths.append(
                                 os.path.join(
                                     os.path.abspath(
-                                        os.path.join(os.path.normpath(uris.to_fs_path(ws.root_uri)), additional_pythonpath_entry)) \
-                                            if ws.root_uri is not None and not os.path.isabs(additional_pythonpath_entry) else additional_pythonpath_entry,
+                                        os.path.join(os.path.normpath(uris.to_fs_path(ws.root_uri)), additional_pythonpath_entry))
+                                    if ws.root_uri is not None and not os.path.isabs(additional_pythonpath_entry) else additional_pythonpath_entry,
                                     name_with_resolved_vars
                                 )
                             )
@@ -346,7 +348,8 @@ class CompletionContext(object):
 
                 for resource_path in check_paths:
                     doc_uri = uris.from_fs_path(resource_path)
-                    resource_doc = ws.get_document(doc_uri, accept_from_file=True)
+                    resource_doc = ws.get_document(
+                        doc_uri, accept_from_file=True)
                     if resource_doc is None:
                         log.info("Resource not found: %s", resource_path)
                         continue
@@ -375,7 +378,8 @@ class CompletionContext(object):
             )
             value = value_if_not_found
         else:
-            robot_variables = self.config.get_setting(OPTION_ROBOT_VARIABLES, dict, {})
+            robot_variables = self.config.get_setting(
+                OPTION_ROBOT_VARIABLES, dict, {})
             value = robot_variables.get(var_name)
             if value is None:
                 log.info("Unable to find variable: %s", var_name)
@@ -414,7 +418,8 @@ class CompletionContext(object):
                 col = token.col_offset
                 cp = cp.create_copy_with_selection(line, col)
                 definitions = find_keyword_definition(
-                    cp, TokenInfo(usage_info.stack, usage_info.node, usage_info.token)
+                    cp, TokenInfo(usage_info.stack,
+                                  usage_info.node, usage_info.token)
                 )
                 if definitions and len(definitions) >= 1:
                     definition: IKeywordDefinition = next(iter(definitions))

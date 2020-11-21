@@ -127,16 +127,17 @@ class _FindDefinitionKeywordCollector(IDefinitionsCollector):
         self.matches = []
 
         self._matcher = RobotStringMatcher(match_name)
-        self._scope_matchers = build_matchers_with_resource_or_library_scope(match_name)
+        self._scope_matchers = build_matchers_with_resource_or_library_scope(
+            match_name)
 
     def accepts(self, keyword_name):
         return True
 
     def on_keyword(self, keyword_found):
         if any(x.keyword_name == keyword_found.keyword_name for x in self.matches):
-           return
+            return
 
-        if self._matcher.is_keyword_name_match(keyword_found.keyword_name):               
+        if self._matcher.is_keyword_name_match(keyword_found.keyword_name):
             definition = _DefinitionFromKeyword(keyword_found)
             self.matches.append(definition)
             return
@@ -163,12 +164,12 @@ class _FindDefinitionVariablesCollector(IDefinitionsCollector):
         self.matches.append(definition)
 
 
-def find_keyword_definition(
-    completion_context: ICompletionContext, token_info: TokenInfo
-) -> Optional[Sequence[IKeywordDefinition]]:
+def find_keyword_definition(completion_context: ICompletionContext,
+                            token_info: TokenInfo
+                            ) -> Optional[Sequence[IKeywordDefinition]]:
     """
     Find a definition only considering Keywords.
-    
+
     The token info must be already computed and must match the completion
     context location.
     """
@@ -209,7 +210,7 @@ def find_definition(completion_context: ICompletionContext) -> Sequence[IDefinit
             library_doc = libspec_manager.get_library_info(
                 token.value, create=True, current_doc_uri=completion_context.doc.uri,
                 arguments=token_info.node.args, alias=token_info.node.alias
-                
+
             )
             if library_doc is not None:
                 definition = _DefinitionFromLibrary(library_doc)

@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 
-name: Build - RobotFramework Language Server Extension
+name: Deploy - RobotFramework Language Server Extension
 jobs:
   deploy:
     runs-on: ubuntu-latest

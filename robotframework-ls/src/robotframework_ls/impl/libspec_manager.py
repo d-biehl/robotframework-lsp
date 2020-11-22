@@ -4,6 +4,8 @@ from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
 import threading
 import urllib
+import hashlib
+
 
 from robotframework_ls.impl.protocols import ILibspecManager
 
@@ -408,8 +410,6 @@ class LibspecManager(ILibspecManager):
         if not isinstance(pyexe, bytes):
             pyexe = pyexe.encode("utf-8")
 
-        import hashlib
-
         digest = hashlib.sha256(pyexe).hexdigest()[:8]
 
         v = cls.get_robot_version()
@@ -803,7 +803,8 @@ class LibspecManager(ILibspecManager):
 
                 encoded_libname = libname
                 if libargs is not None:
-                    encoded_libname += f"::{libargs}"
+                    digest = hashlib.sha256(libargs.encode()).hexdigest()[:8]
+                    encoded_libname += f"::{digest}"
 
                 if alias is not None:
                     encoded_libname += f"@{alias}"

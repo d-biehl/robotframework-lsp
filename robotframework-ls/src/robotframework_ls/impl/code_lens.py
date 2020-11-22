@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 
 from robot.parsing.model.blocks import *
 
@@ -32,7 +32,7 @@ class CodeLensVisitor(ModelVisitor):
         self.generic_visit(node)
 
 
-def code_lens(completion_context: CompletionContext, doc_uri: str) -> Optional[list[dict]]:
+def code_lens(completion_context: CompletionContext, doc_uri: str) -> Optional[List[Dict]]:
     result = list([x.to_dict() for x in CodeLensVisitor.find_from(
         completion_context.get_ast(), doc_uri)])
     return result

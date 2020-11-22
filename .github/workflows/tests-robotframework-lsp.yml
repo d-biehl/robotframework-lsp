@@ -94,3 +94,15 @@ jobs:
         name: tests_output.${{ matrix.name }}.txt
         path: robotframework-ls/tests/tests_output
 
+    - name: Build wheel
+      working-directory: ./robotframework-ls/src
+      run: |
+        cp ../README.md ./README.md
+        python setup.py sdist bdist_wheel --universal
+    - run: npm install -g vsce
+    - run: vsce package -o robotframework-lsp.vsix
+    - uses: actions/upload-artifact@v1
+      with:
+        name: robotframework-lsp.vsix
+        path: ./robotframework-ls/robotframework-lsp.vsix
+

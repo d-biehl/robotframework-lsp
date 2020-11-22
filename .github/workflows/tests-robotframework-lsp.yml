@@ -12,6 +12,8 @@ on:
     - robotframework-ls/**
     - robocorp-python-ls-core/**
     - .github/**
+
+    workflow_dispatch:
       
 jobs:
   build:

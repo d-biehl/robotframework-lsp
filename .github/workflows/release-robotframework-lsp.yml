@@ -54,15 +54,15 @@ jobs:
       with:
         name: robotframework-lsp.vsix
         path: ./robotframework-ls/robotframework-lsp.vsix
-    - name: Check tag version
-      run: python -m dev check-tag-version
-    - name: Upload to PyPI
-      working-directory: ./robotframework-ls/src
-      run: twine upload dist/*
-      env:
-        TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
-    - name: Publish to vscode marketplace 
-      run: vsce publish -p $VSCE_TOKEN
-      env:
-        VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+    # - name: Check tag version
+    #   run: python -m dev check-tag-version
+    # - name: Upload to PyPI
+    #   working-directory: ./robotframework-ls/src
+    #   run: twine upload dist/*
+    #   env:
+    #     TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+    #     TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+    # - name: Publish to vscode marketplace 
+    #   run: vsce publish -p $VSCE_TOKEN
+    #   env:
+    #     VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}

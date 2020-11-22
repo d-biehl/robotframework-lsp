@@ -92,15 +92,4 @@ jobs:
     - uses: actions/upload-artifact@v1
       with:
         name: tests_output.${{ matrix.name }}.txt
-        path: robotframework-ls/tests/tests_output
-
-    - name: Build wheel
-      working-directory: ./robotframework-ls
-      run: |
-        npm install -g vsce
-        vsce package -o robotframework-lsp.vsix    
-    - uses: actions/upload-artifact@v1
-      with:
-        name: robotframework-lsp.vsix
-        path: ./robotframework-ls/robotframework-lsp.vsix
-
+        path: robotframework-ls/tests/tests_output  

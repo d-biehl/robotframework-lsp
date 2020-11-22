@@ -1,10 +1,20 @@
 on:
   push:
-    branches:
-      - "release-robotframework-lsp"
-    tags:
-      - "robotframework-lsp-*"
-name: Deploy - RobotFramework Language Server Extension
+    paths:
+    - robotframework-ls/**
+    - robocorp-python-ls-core/**
+    - .github/**
+
+  pull_request:
+    paths:
+    - robotframework-ls/**
+    - robocorp-python-ls-core/**
+    - .github/** 
+
+  workflow_dispatch:
+
+
+name: Build - RobotFramework Language Server Extension
 jobs:
   deploy:
     runs-on: ubuntu-latest

@@ -54,7 +54,7 @@ jobs:
 #       env:
 #         TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
 #         TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
-    - name: Publish to vscode marketplace 
-      run: vsce publish -p $VSCE_TOKEN
-      env:
-        VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+    # - name: Publish to vscode marketplace 
+    #   run: vsce publish -p $VSCE_TOKEN
+    #   env:
+    #     VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}

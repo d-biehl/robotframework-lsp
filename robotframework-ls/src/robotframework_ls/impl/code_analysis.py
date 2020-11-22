@@ -8,12 +8,12 @@ import robot.parsing.lexer.tokens as tokens
 
 from robocorp_ls_core.lsp import Error
 from robocorp_ls_core.robotframework_log import get_logger
-from robotframework_ls.impl.protocols import ICompletionContext
+from robotframework_ls.impl.protocols import ICompletionContext, IKeywordCollector
 from robotframework_ls.impl import ast_utils
-from robotframework_ls.impl.ast_utils import create_error_from_node
+from robotframework_ls.impl.ast_utils import MAX_ERRORS, create_error_from_node
 from robotframework_ls.impl.collect_keywords import collect_keywords
 from robotframework_ls.impl.text_utilities import normalize_robot_name
-from robotframework_ls.impl.ast_utils import MAX_ERRORS, create_error_from_node
+
 
 log = get_logger(__name__)
 
@@ -64,7 +64,7 @@ class _KeywordContainer(object):
         return None
 
 
-class _KeywordsCollector(object):
+class _KeywordsCollector(IKeywordCollector):
     def __init__(self):
         self._keywords_container = _KeywordContainer()
         self._resource_name_to_keywords_container = {}
@@ -423,16 +423,10 @@ class ErrorVisitor(blocks.ModelVisitor):
 
 
 def collect_analysis_errors(completion_context: ICompletionContext):
-    import time
-
-    start = time.time()
-
     errors = []
     collector = _KeywordsCollector()
     collect_keywords(completion_context, collector)
-    log.info(f"collect kw {time.time() - start}")
-
-    start = time.time()
+    
     ast = completion_context.get_ast()
     for keyword_usage_info in ast_utils.iter_keyword_usage_tokens(ast):
         completion_context.check_cancelled()
@@ -468,11 +462,7 @@ def collect_analysis_errors(completion_context: ICompletionContext):
             # i.e.: Collect at most 100 errors
             break
 
-    log.info(f"kw completion {time.time() - start}")
-
-    start = time.time()
     #errors += ErrorVisitor.find_from(ast)
     errors += CodeAnalysisVisitor.find_from(completion_context)
-    log.info(f"visitor {time.time() - start}")
 
     return errors

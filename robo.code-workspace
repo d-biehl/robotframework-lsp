@@ -13,5 +13,8 @@
 			"path": "..\\..\\..\\Users\\daniel\\.virtualenvs\\robotframework-ls-eIJxjzm1\\src\\robotframework"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.testing.pytestEnabled": true,
+		"python.testing.unittestEnabled": true
+	}
 }

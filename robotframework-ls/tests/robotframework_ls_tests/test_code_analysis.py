@@ -148,8 +148,8 @@ Test
     from robotframework_ls.robot_config import RobotConfig
 
     config = RobotConfig()
-    # Note: we don't give errors if we can't resolve a resource.
-    _collect_errors(workspace, doc, data_regression, basename="no_error", config=config)
+    
+    _collect_errors(workspace, doc, data_regression, basename="test_resource_does_not_exist", config=config)
 
 
 def test_casing_on_filename(workspace, libspec_manager, data_regression):

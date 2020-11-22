@@ -11,6 +11,11 @@ prospector = "*"
 pylint = "*"
 pycodestyle = "*"
 pytest = "*"
+pytest_timeout = "*"
+mock = "*"
+pytest-regressions = "*"
+pytest-xdist = "*"
+psutil = "*"
 
 [packages]
 robotframework = {editable = true, git = "https://github.com/robotframework/robotframework.git"}

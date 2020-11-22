@@ -95,7 +95,7 @@ jobs:
         path: robotframework-ls/tests/tests_output
 
     - name: Build wheel
-      working-directory: ./robotframework-ls/src
+      working-directory: ./robotframework-ls
       run: |
         npm install -g vsce
         vsce package -o robotframework-lsp.vsix    

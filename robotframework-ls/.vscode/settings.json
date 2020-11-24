@@ -5,8 +5,9 @@
         "node_modules": true,
         "**/*.pyc": true,
         "src/build/": true,
-        ".mypy_cache/": true,
-        ".pytest_cache/": true
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/__pycache__": true
     },
     "search.exclude": {
         "out": true // set this to false to include "out" folder in search results

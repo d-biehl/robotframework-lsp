@@ -927,7 +927,7 @@ class LibspecManager(ILibspecManager):
             return True
         return False
 
-    def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=None, alias=None):
+    def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=(), alias=None):
         """
         :param libname:
             It may be a library name, a relative path to a .py file or an
@@ -948,7 +948,7 @@ class LibspecManager(ILibspecManager):
 
         for lib_info in self._iter_lib_info():
             library_doc = lib_info.library_doc
-            if library_doc.name and library_doc.name.lower() == libname_lower and lib_info.arguments == arguments:
+            if library_doc.name and library_doc.name.lower() == libname_lower and lib_info.arguments == arguments or ():
                 if not lib_info.verify_sources_sync(arguments, alias):
                     if create:
                         # Found but it's not in sync. Try to regenerate (don't proceed
@@ -979,5 +979,5 @@ class LibspecManager(ILibspecManager):
         log.debug("Unable to find library named: %s", libname)
         return None
 
-    def get_library_error(self, libname, current_doc_uri=None, arguments=None, alias=None):
+    def get_library_error(self, libname, current_doc_uri=None, arguments=(), alias=None):
         return self.libspec_errors.get(LibspecErrorEntry(libname, arguments, alias, current_doc_uri), None)

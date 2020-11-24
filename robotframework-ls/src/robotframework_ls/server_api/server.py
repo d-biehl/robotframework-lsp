@@ -1,11 +1,13 @@
+from robocorp_ls_core.lsp import SymbolInformationTypedDict
+from robocorp_ls_core.jsonrpc.endpoint import require_monitor
+from functools import partial
+from robocorp_ls_core.protocols import IConfig, IMonitor
+from typing import Optional, List
+from typing import Dict, Optional, Union
 from robocorp_ls_core.constants import Null
 from robocorp_ls_core.python_ls import PythonLanguageServer
 from robocorp_ls_core.basic import overrides
 from robocorp_ls_core.robotframework_log import get_logger
-from typing import Optional, Union
-from robocorp_ls_core.protocols import IConfig, IMonitor
-from functools import partial
-from robocorp_ls_core.jsonrpc.endpoint import require_monitor
 
 
 log = get_logger(__name__)
@@ -353,7 +355,7 @@ class RobotFrameworkServerApi(PythonLanguageServer):
 
     def _threaded_code_lens(
         self, doc_uri: str, monitor: IMonitor
-    ) -> Optional[dict]:
+    ) -> Optional[List[Dict]]:
         from robotframework_ls.impl.code_lens import code_lens
 
         completion_context = self._create_completion_context(
@@ -363,6 +365,31 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             return None
 
         return code_lens(completion_context, doc_uri)
+
+    def m_workspace_symbols(self, query: Optional[str] = None):
+        func = partial(self._threaded_workspace_symbols, query)
+        func = require_monitor(func)
+        return func
+
+    def _threaded_workspace_symbols(
+        self, query: Optional[str], monitor: IMonitor
+    ) -> Optional[List[SymbolInformationTypedDict]]:
+        from robotframework_ls.impl.workspace_symbols import workspace_symbols
+        from robotframework_ls.impl.completion_context import BaseContext
+        from robotframework_ls.impl.protocols import IRobotWorkspace
+        from typing import cast
+
+        workspace = self._workspace
+        if not workspace:
+            return []
+
+        robot_workspace = cast(IRobotWorkspace, workspace)
+
+        return workspace_symbols(
+            query,
+            BaseContext(workspace=robot_workspace,
+                        config=self.config, monitor=monitor),
+        )
 
     def m_shutdown(self, **_kwargs):
         PythonLanguageServer.m_shutdown(self, **_kwargs)

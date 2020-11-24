@@ -36,6 +36,8 @@ class IRobotDocument(IDocument, Protocol):
     def get_ast(self) -> Any:
         pass
 
+    symbols_cache: Optional[list] = None
+
 
 class ILibspecManager(Protocol):
     def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=None, alias=None):

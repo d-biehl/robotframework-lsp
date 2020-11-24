@@ -10,6 +10,8 @@ import hashlib
 
 
 from robotframework_ls.impl.protocols import ILibspecManager
+from robotframework_ls.impl.robot_specbuilder import LibraryDoc
+from typing import Optional
 
 log = get_logger(__name__)
 
@@ -249,7 +251,7 @@ class _LibInfo(object):
                     self._invalid = True
                     return False
             except:
-                pass           
+                pass
 
         return True
 
@@ -449,8 +451,8 @@ class LibspecManager(ILibspecManager):
             self._libspec_dir, "user"
         )
         self._builtins_libspec_dir = (
-            builtin_libspec_dir
-            or self.get_internal_builtins_libspec_dir(self._libspec_dir)
+            builtin_libspec_dir or self.get_internal_builtins_libspec_dir(
+                self._libspec_dir)
         )
         log.debug("User libspec dir: %s", self._user_libspec_dir)
         log.debug("Builtins libspec dir: %s", self._builtins_libspec_dir)
@@ -736,11 +738,7 @@ class LibspecManager(ILibspecManager):
                 # some cases we may create libraries for namespace packages
                 # (i.e.: empty folders) which don't really have anything -- in
                 # this case, this isn't a valid library.
-                if (
-                    info is not None
-                    and info.library_doc is not None
-                    and info.library_doc.keywords
-                ):
+                if (info is not None and info.library_doc is not None and info.library_doc.keywords):
                     yield info
 
     def get_library_names(self):
@@ -817,7 +815,7 @@ class LibspecManager(ILibspecManager):
 
                 libspec_error_entry = LibspecErrorEntry(
                     libname, arguments, alias, current_doc_uri)
-                
+
                 if libspec_error_entry in self.libspec_errors:
                     del self.libspec_errors[libspec_error_entry]
 
@@ -877,7 +875,8 @@ class LibspecManager(ILibspecManager):
 
                         # strip the traceback part from output
                         # self.libspec_errors[libspec_error_entry] = s[:s.rfind('Try --help for usage information.')].strip()
-                        self.libspec_errors[libspec_error_entry] = s[:s.find('Traceback')].strip()
+                        self.libspec_errors[libspec_error_entry] = s[:s.find(
+                            'Traceback')].strip()
 
                         return False
                     _dump_spec_filename_additional_info(
@@ -927,7 +926,7 @@ class LibspecManager(ILibspecManager):
             return True
         return False
 
-    def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=(), alias=None):
+    def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=(), alias=None) -> Optional[LibraryDoc]:
         """
         :param libname:
             It may be a library name, a relative path to a .py file or an

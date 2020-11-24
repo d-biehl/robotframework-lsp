@@ -120,7 +120,8 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         :Note: async complete.
         """
         return self.request_async(
-            self._build_msg("sectionNameComplete", doc_uri=doc_uri, line=line, col=col)
+            self._build_msg("sectionNameComplete",
+                            doc_uri=doc_uri, line=line, col=col)
         )
 
     def request_keyword_complete(
@@ -130,7 +131,8 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         :Note: async complete.
         """
         return self.request_async(
-            self._build_msg("keywordComplete", doc_uri=doc_uri, line=line, col=col)
+            self._build_msg("keywordComplete", doc_uri=doc_uri,
+                            line=line, col=col)
         )
 
     def request_complete_all(self, doc_uri, line, col) -> Optional[IIdMessageMatcher]:
@@ -149,7 +151,8 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         :Note: async complete.
         """
         return self.request_async(
-            self._build_msg("findDefinition", doc_uri=doc_uri, line=line, col=col)
+            self._build_msg("findDefinition", doc_uri=doc_uri,
+                            line=line, col=col)
         )
 
     def request_source_format(
@@ -159,7 +162,8 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         :Note: async complete.
         """
         return self.request_async(
-            self._build_msg("codeFormat", text_document=text_document, options=options)
+            self._build_msg(
+                "codeFormat", text_document=text_document, options=options)
         )
 
     def request_signature_help(self, doc_uri, line, col) -> Optional[IIdMessageMatcher]:
@@ -167,7 +171,8 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         :Note: async complete.
         """
         return self.request_async(
-            self._build_msg("signatureHelp", doc_uri=doc_uri, line=line, col=col)
+            self._build_msg("signatureHelp", doc_uri=doc_uri,
+                            line=line, col=col)
         )
 
     def request_hover(self, doc_uri, line, col) -> Optional[IIdMessageMatcher]:
@@ -177,7 +182,7 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         return self.request_async(
             self._build_msg("hover", doc_uri=doc_uri, line=line, col=col)
         )
-    
+
     def request_folding_range(self, doc_uri) -> Optional[IIdMessageMatcher]:
         """
         :Note: async complete.
@@ -193,6 +198,14 @@ class RobotFrameworkApiClient(LanguageServerClientBase):
         return self.request_async(
             self._build_msg("codeLens", doc_uri=doc_uri)
         )
+
+    def request_workspace_symbols(
+        self, query: Optional[str] = None
+    ) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+        return self.request_async(self._build_msg("workspaceSymbols", query=query))
 
     def request_cancel(self, message_id):
         self._check_process_alive()

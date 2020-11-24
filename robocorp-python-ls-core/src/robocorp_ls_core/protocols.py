@@ -23,9 +23,14 @@ if sys.version_info[:2] < (3, 8):
     class Protocol(object):
         pass
 
+    class TypedDict(object):
+        def __init_subclass__(self, *args, **kwargs):
+            pass
+
 
 else:
     from typing import Protocol
+    from typing import TypedDict
 
 
 T = TypeVar("T")
@@ -44,7 +49,7 @@ def check_implements(x: T) -> T:
     :important: It must be the last method in a class due to
                 https://github.com/python/mypy/issues/9266
 
-	Example:
+        Example:
 
     def __typecheckself__(self) -> None:
         _: IExpectedProtocol = check_implements(self)
@@ -142,7 +147,7 @@ class ILanguageServerClientBase(IRequestCancellable, Protocol):
     def request_async(self, contents: Dict) -> Optional[IIdMessageMatcher]:
         """
         API which allows to wait for the message to complete.
-        
+
         To use:
             message_matcher = client.request_async(contents)
             if message_matcher is not None:
@@ -151,11 +156,11 @@ class ILanguageServerClientBase(IRequestCancellable, Protocol):
                     msg = message_matcher.msg
                 else:
                     # Timed out
-            
+
         :param contents:
             Something as:
             {"jsonrpc": "2.0", "id": msg_id, "method": method_name, "params": params}
-            
+
         :return _MessageMatcher:
         """
 
@@ -171,7 +176,7 @@ class ILanguageServerClientBase(IRequestCancellable, Protocol):
         :return:
             The returned message if everything goes ok.
             `default` if the communication dropped in the meanwhile and timeout was None.
-        
+
         :raises:
             TimeoutError if the timeout was given and no answer was given at the available time
             (including if the communication was dropped).
@@ -182,7 +187,7 @@ class ILanguageServerClientBase(IRequestCancellable, Protocol):
     ) -> IMessageMatcher:
         """
         Can be used as:
-        
+
         message_matcher = language_server.obtain_pattern_message_matcher(
             {"method": "textDocument/publishDiagnostics"}
         )
@@ -268,25 +273,33 @@ class IRobotFrameworkApiClient(ILanguageServerClientBase, Protocol):
         :Note: async complete.
         """
 
+    def request_workspace_symbols(
+        self, query: Optional[str] = None
+    ) -> Optional[IIdMessageMatcher]:
+        """
+        :Note: async complete.
+        """
+
     def request_hover(
         self, doc_uri: str, line: int, col: int
     ) -> Optional[IIdMessageMatcher]:
         """
         :Note: async complete.
         """
+
     def request_folding_range(
         self, doc_uri: str
     ) -> Optional[IIdMessageMatcher]:
         """
         :Note: async complete.
         """
+
     def request_code_lens(
         self, doc_uri: str
     ) -> Optional[IIdMessageMatcher]:
         """
         :Note: async complete.
         """
-
 
 
 class ILanguageServerClient(ILanguageServerClientBase, Protocol):
@@ -357,6 +370,9 @@ class ILanguageServerClient(ILanguageServerClientBase, Protocol):
     def request_signature_help(self, uri: str, line: int, col: int):
         pass
 
+    def request_workspace_symbols(self, query: Optional[str] = None):
+        pass
+
 
 class IConfig(Protocol):
     def get_setting(
@@ -365,13 +381,13 @@ class IConfig(Protocol):
         """
         :param key:
             The setting to be gotten (i.e.: my.setting.to.get)
-            
+
         :param expected_type:
             The type which we're expecting.
-            
+
         :param default:
             If given, return this value instead of throwing a KeyError.
-            
+
         :raises:
             KeyError if the setting could not be found and default was not provided.
         """
@@ -430,7 +446,7 @@ class IDirCache(Protocol):
         :param key:
             The key to be persisted. It's repr(key) is used to calculate
             the key filename on the disk. 
-            
+
         :note that the values do a round-trip with json (so, caveats
         such as saving a tuple and loading a list apply).
         """
@@ -438,10 +454,10 @@ class IDirCache(Protocol):
     def load(self, key: Any, expected_class: Type) -> Any:
         """
         Loads a previously persisted value.
-        
+
         If it doesn't exist, there's some error loading or the expected 
         class doesn't match the loaded value a KeyError is thrown. 
-        
+
         :note: users should check that the cache value is what's expected when it's
            gotten (as the data may become corrupted on disk or may change across
            versions).

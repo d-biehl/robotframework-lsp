@@ -1,5 +1,7 @@
+from collections import namedtuple
 import os
 import sys
+from typing import Dict, Generator, List, Set
 from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
 import threading
@@ -10,6 +12,8 @@ import hashlib
 from robotframework_ls.impl.protocols import ILibspecManager
 
 log = get_logger(__name__)
+
+LibspecErrorEntry = namedtuple("LibspecError", "libname arguments alias uri")
 
 
 def _normfile(filename):
@@ -200,8 +204,9 @@ class _LibInfo(object):
     def alias(self):
         return self.additional_info.get(_ALIAS, None)
 
+    @property
     def arguments(self):
-        return tuple(self.additional_info.get(_ARGUMENTS, []) or [])
+        return tuple(self.additional_info.get(_ARGUMENTS, None) or [])
 
     def verify_sources_sync(self, arguments, alias):
         """
@@ -238,16 +243,13 @@ class _LibInfo(object):
                 return False
 
             try:
-                if tuple(additional_info.get(_ARGUMENTS, []) or []) != (arguments or ()):
+                if self.arguments != arguments:
                     log.info(
                         "Library %s is invalid. Arguments changes" % self.library_doc.name)
                     self._invalid = True
                     return False
             except:
-                pass
-
-            if additional_info.get(_ALIAS, None) != alias:
-                return False
+                pass           
 
         return True
 
@@ -463,6 +465,8 @@ class LibspecManager(ILibspecManager):
         except:
             # Ignore exception if it's already created.
             pass
+
+        self.libspec_errors: Dict[LibspecErrorEntry, str] = {}
 
         # Spec info found in the workspace
         self._workspace_folder_uri_to_folder_info = {}
@@ -698,10 +702,7 @@ class LibspecManager(ILibspecManager):
         self.synchronize_additional_pythonpath_folders()
         self.synchronize_internal_libspec_folders()
 
-    def _iter_lib_info(self):
-        """
-        :rtype: generator(_LibInfo)
-        """
+    def _iter_lib_info(self) -> Generator[_LibInfo, None, None]:
         # Note: the iteration order is important (first ones are visited earlier
         # and have higher priority).
         iter_in = []
@@ -743,9 +744,7 @@ class LibspecManager(ILibspecManager):
                     yield info
 
     def get_library_names(self):
-        return sorted(
-            set(lib_info.library_doc.name for lib_info in self._iter_lib_info())
-        )
+        return sorted(set(lib_info.library_doc.name for lib_info in self._iter_lib_info()))
 
     def _create_libspec(
         self,
@@ -756,7 +755,8 @@ class LibspecManager(ILibspecManager):
         additional_path=None,
         is_builtin=False,
         arguments=None,
-        alias=None
+        alias=None,
+        current_doc_uri=None
     ):
         """
         :param str libname:
@@ -814,9 +814,15 @@ class LibspecManager(ILibspecManager):
 
                 log.debug(
                     f"Obtaining mutex to generate libpsec: {libspec_filename}.")
-                with timed_acquire_mutex(
-                    _get_libspec_mutex_name(libspec_filename)
-                ):  # Could fail.
+
+                libspec_error_entry = LibspecErrorEntry(
+                    libname, arguments, alias, current_doc_uri)
+                
+                if libspec_error_entry in self.libspec_errors:
+                    del self.libspec_errors[libspec_error_entry]
+
+                # Could fail.
+                with timed_acquire_mutex(_get_libspec_mutex_name(libspec_filename)):
                     log.debug(
                         f"Obtained mutex to generate libpsec: {libspec_filename}."
                     )
@@ -865,8 +871,14 @@ class LibspecManager(ILibspecManager):
 
                     except subprocess.CalledProcessError as e:
                         log.exception(
-                            "Error creating libspec: %s. Output:\n%s", libname, e.output
-                        )
+                            "Error creating libspec: %s. Output:\n%s", libname, e.output)
+
+                        s = e.output.decode()
+
+                        # strip the traceback part from output
+                        # self.libspec_errors[libspec_error_entry] = s[:s.rfind('Try --help for usage information.')].strip()
+                        self.libspec_errors[libspec_error_entry] = s[:s.find('Traceback')].strip()
+
                         return False
                     _dump_spec_filename_additional_info(
                         libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias
@@ -910,7 +922,7 @@ class LibspecManager(ILibspecManager):
             if libname.lower().endswith((".py", ".class", ".java")):
                 libname = os.path.splitext(libname)[0]
 
-        if self._create_libspec(libname, additional_path=additional_path, cwd=cwd, arguments=arguments, alias=alias):
+        if self._create_libspec(libname, additional_path=additional_path, cwd=cwd, arguments=arguments, alias=alias, current_doc_uri=current_doc_uri):
             self.synchronize_internal_libspec_folders()
             return True
         return False
@@ -936,7 +948,7 @@ class LibspecManager(ILibspecManager):
 
         for lib_info in self._iter_lib_info():
             library_doc = lib_info.library_doc
-            if library_doc.name and library_doc.name.lower() == libname_lower and lib_info.alias == alias:
+            if library_doc.name and library_doc.name.lower() == libname_lower and lib_info.arguments == arguments:
                 if not lib_info.verify_sources_sync(arguments, alias):
                     if create:
                         # Found but it's not in sync. Try to regenerate (don't proceed
@@ -966,3 +978,6 @@ class LibspecManager(ILibspecManager):
 
         log.debug("Unable to find library named: %s", libname)
         return None
+
+    def get_library_error(self, libname, current_doc_uri=None, arguments=None, alias=None):
+        return self.libspec_errors.get(LibspecErrorEntry(libname, arguments, alias, current_doc_uri), None)

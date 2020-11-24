@@ -59,7 +59,7 @@ class CompletionContext(ICompletionContext):
         workspace=None,
         config=None,
         memo=None,
-        monitor: Union[IMonitor, Null] = NULL,
+        monitor: Union[IMonitor, Null, None] = NULL,
     ) -> None:
         """
         :param robocorp_ls_core.workspace.Document doc:

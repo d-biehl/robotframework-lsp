@@ -4,12 +4,11 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-autopep8 = "*"
-bandit = "*"
+flake8 = "*"
 mypy = "*"
-prospector = "*"
 pylint = "*"
-pycodestyle = "*"
+autopep8 = "*"
+
 pytest = "*"
 pytest_timeout = "*"
 mock = "*"
@@ -18,9 +17,6 @@ pytest-xdist = "*"
 psutil = "*"
 
 [packages]
-robotframework = {editable = true, git = "https://github.com/robotframework/robotframework.git"}
+robotframework = "*"
 watchdog = {editable = true, path = "./../robocorp-python-ls-core/src"}
 robotframework-lsp = {editable = true, path = "./src"}
-
-[requires]
-python_version = "3.9"

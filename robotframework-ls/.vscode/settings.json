@@ -4,10 +4,15 @@
         "out": true, // set this to true to hide the "out" folder with the compiled JS files
         "node_modules": true,
         "**/*.pyc": true,
-        "src/build/": true
+        "src/build/": true,
+        ".mypy_cache/": true,
+        ".pytest_cache/": true
     },
     "search.exclude": {
         "out": true // set this to false to include "out" folder in search results
     },
-    "python.pythonPath": "C:\\Users\\daniel\\.virtualenvs\\robotframework-ls-eIJxjzm1\\Scripts\\python.exe"
+    "python.pythonPath": "C:\\Users\\daniel\\.virtualenvs\\robotframework-ls-eIJxjzm1\\Scripts\\python.exe",
+    "python.linting.flake8Args": [
+        "--ignore=E501"
+    ]
 }

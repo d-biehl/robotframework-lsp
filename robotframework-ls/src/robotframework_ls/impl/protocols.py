@@ -36,8 +36,12 @@ class IRobotDocument(IDocument, Protocol):
     def get_ast(self) -> Any:
         pass
 
-class ILibspecManager:
+
+class ILibspecManager(Protocol):
     def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=None, alias=None):
+        pass
+
+    def get_library_error(self, libname,  current_doc_uri=None, arguments=None, alias=None):
         pass
 
 

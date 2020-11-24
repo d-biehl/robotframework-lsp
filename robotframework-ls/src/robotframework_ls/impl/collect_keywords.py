@@ -261,7 +261,7 @@ def _collect_libraries_keywords(completion_context, collector):
 
     libraries = completion_context.get_imported_libraries()
     library_infos = set(_LibInfo(library.name, library.alias, library.args) for library in libraries)
-    library_infos.add(_LibInfo(BUILTIN_LIB, None, None))
+    library_infos.add(_LibInfo(BUILTIN_LIB, None, ()))
     libspec_manager = completion_context.workspace.libspec_manager
 
     for library_info in library_infos:        

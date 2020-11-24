@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any, Union, List
 
 from robot.variables import is_scalar_assign
 from robot.parsing.model.blocks import FirstStatementFinder, LastStatementFinder
@@ -14,6 +14,7 @@ from robotframework_ls.impl.ast_utils import MAX_ERRORS, create_error_from_node
 from robotframework_ls.impl.collect_keywords import collect_keywords
 from robotframework_ls.impl.text_utilities import normalize_robot_name
 
+from .robot_visitors import CompletionContextModelVisitor, IsEmptyVisitor
 
 log = get_logger(__name__)
 
@@ -169,57 +170,45 @@ class _KeywordsCollector(IKeywordCollector):
         return multi
 
 
-def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token, message: str) -> Error:
+def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token, message: str, source=None) -> Error:
     if not end_token:
         end_token = start_token
 
     return Error(message,
-                 start=(start_token.lineno-1,
+                 start=(start_token.lineno - 1,
                         start_token.col_offset) if start_token else (-1, -1),
-                 end=(end_token.lineno-1,
-                      end_token.end_col_offset) if end_token else (-1, -1))
+                 end=(end_token.lineno - 1,
+                      end_token.end_col_offset) if end_token else (-1, -1),
+                 source=source)
 
 
-def create_error_from_statements(start_statement: statements.Statement, end_statement: statements.Statement, message: str) -> Error:
+def create_error_from_statements(start_statement: statements.Statement, end_statement: statements.Statement, message: str, source=None) -> Error:
     start = next((t for t in start_statement.tokens if t.type not in tokens.Token.NON_DATA_TOKENS),
                  start_statement.tokens[0]) if start_statement is not None else None
 
     end = next((t for t in reversed(end_statement.tokens)
                 if t.type not in tokens.Token.NON_DATA_TOKENS), end_statement.tokens[-1]) if end_statement is not None else None
 
-    return create_error_from_tokens(start, end, message)
+    return create_error_from_tokens(start, end, message, source)
 
 
-def create_error(block_statement_token: Union[blocks.Block, statements.Statement, tokens.Token], message: str):
+def create_error(block_statement_token: Union[blocks.Block, statements.Statement, tokens.Token], message: str, source=None):
     if isinstance(block_statement_token, tokens.Token):
-        return create_error_from_tokens(block_statement_token, block_statement_token, message)
+        return create_error_from_tokens(block_statement_token, block_statement_token, message, source)
 
     if isinstance(block_statement_token, blocks.Block):
-        first_statement = FirstStatementFinder.find_from(
-            block_statement_token)
-        last_statement = LastStatementFinder.find_from(
-            block_statement_token)
+        first_statement = FirstStatementFinder.find_from(block_statement_token)
+        last_statement = LastStatementFinder.find_from(block_statement_token)
 
-        return create_error_from_statements(first_statement, last_statement, message)
+        return create_error_from_statements(first_statement, last_statement, message, source)
 
-    return create_error_from_statements(block_statement_token, block_statement_token, message)
+    return create_error_from_statements(block_statement_token, block_statement_token, message, source)
 
 
-class CompletionContextModelVisitor(blocks.ModelVisitor):
-    def __init__(self, completion_context: ICompletionContext):
-        super().__init__()
-        self.completion_context = completion_context
+class FindEmptyIfBlocksVisitor(CompletionContextModelVisitor):
 
-    def visit(self, node):
-        if self.completion_context is not None:
-            self.completion_context.check_cancelled()
-        super().visit(node)
-
-
-class FindEmptyIfBlocksVisitor(blocks.ModelVisitor):
-
-    def __init__(self, model):
-        super().__init__()
+    def __init__(self, model, completion_context: ICompletionContext = None):
+        super().__init__(completion_context)
         self.result = []
         self.model = model
         self.current_branch = None
@@ -228,8 +217,8 @@ class FindEmptyIfBlocksVisitor(blocks.ModelVisitor):
         self.else_has_seen = False
 
     @classmethod
-    def find_from(cls, model):
-        finder = cls(model.body)
+    def find_from(cls, model, completion_context: ICompletionContext = None):
+        finder = cls(model.body, completion_context)
         finder.current_branch = model
         finder.visit(model.body)
         finder.check_is_empty()
@@ -253,7 +242,7 @@ class FindEmptyIfBlocksVisitor(blocks.ModelVisitor):
         self.current_branch_name = "ELSE IF"
         if self.else_has_seen:
             self.result.append(
-                (self.current_branch, f"'ELSE IF' after 'ELSE'."))
+                (self.current_branch, "'ELSE IF' after 'ELSE'."))
 
     def visit_Else(self, node):
         self.check_is_empty()
@@ -261,7 +250,7 @@ class FindEmptyIfBlocksVisitor(blocks.ModelVisitor):
         self.current_branch_name = "ELSE"
         if self.else_has_seen:
             self.result.append(
-                (self.current_branch, f"Multiple 'ELSE' branches."))
+                (self.current_branch, "Multiple 'ELSE' branches."))
         self.else_has_seen = True
 
     def visit_list(self, node) -> Any:
@@ -276,41 +265,10 @@ class FindEmptyIfBlocksVisitor(blocks.ModelVisitor):
             self.is_empty = False
 
 
-class IsEmptyVisitor(blocks.ModelVisitor):
-
-    def __init__(self, model):
-        super().__init__()
-        self.result = True
-        self.model = model
-
-    @classmethod
-    def find_from(cls, model):
-        finder = cls(model)
-        finder.visit(model)
-        return finder.result
-
-    def visit_EmptyLine(self, node):
-        pass
-
-    def visit_Comment(self, node):
-        pass
-
-    def visit_list(self, node) -> Any:
-        if self.model == node:
-            for n in node:
-                self.visit(n)
-
-    def generic_visit(self, node) -> Any:
-        if self.model == node:
-            super().generic_visit(node)
-        else:
-            self.result = False
-
-
 class CodeAnalysisVisitor(CompletionContextModelVisitor):
     def __init__(self, completion_context: ICompletionContext):
         super().__init__(completion_context)
-        self.errors = []
+        self.errors: List[Error] = []
         self.completion_context = completion_context
 
     @classmethod
@@ -319,8 +277,8 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         finder.visit(completion_context.get_ast())
         return finder.errors
 
-    def append_error(self, node: Union[blocks.Block, statements.Statement, tokens.Token], message: str):
-        self.errors.append(create_error(node, message))
+    def append_error(self, node: Union[blocks.Block, statements.Statement, tokens.Token], message: str, source=None):
+        self.errors.append(create_error(node, message, source))
 
     def visit_ForLoopHeader(self, node):
         if not node.variables:
@@ -342,7 +300,7 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         self.generic_visit(node)
 
     def visit_ForLoop(self, node):
-        if not node.body or IsEmptyVisitor.find_from(node.body):
+        if not node.body or IsEmptyVisitor.find_from(node.body, self.completion_context):
             self.append_error(node.header or node, 'FOR loop has empty body.')
         if not node.end:
             self.append_error(node.header or node,
@@ -366,7 +324,7 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         if not node.body:
             self.append_error(node.header or node, 'IF has empty branch.')
 
-        for n, msg in FindEmptyIfBlocksVisitor.find_from(node):
+        for n, msg in FindEmptyIfBlocksVisitor.find_from(node, self.completion_context):
             self.append_error(n or node.header or node, msg)
 
         if not node.end:
@@ -379,10 +337,18 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
             lib_info = self.completion_context.workspace.libspec_manager.get_library_info(
                 node.name, False, self.completion_context.doc.uri, arguments=node.args, alias=node.alias)
             if lib_info is None:
+
                 self.append_error(node.get_token(
-                    tokens.Token.NAME) or node, f"Importing test library '{node.name}' failed.")
+                    tokens.Token.NAME) or node, f"Importing test library '{node.name}' failed")
+
+                libdoc_error = self.completion_context.workspace.libspec_manager.get_library_error(
+                    node.name, self.completion_context.doc.uri, node.args, node.alias)
+                if libdoc_error is not None:
+                    self.append_error(node.get_token(
+                        tokens.Token.NAME) or node, libdoc_error, source="robot.libdoc")
+
         else:
-            self.append_error(node, f"Library setting requires value.")
+            self.append_error(node, "Library setting requires value.")
 
         self.generic_visit(node)
 
@@ -399,8 +365,8 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
     def visit_KeywordCall(self, node: statements.KeywordCall):
         if node.keyword and node.keyword.lower() in ["end", "if", "else if", "for"]:
-            self.append_error(node.get_token(tokens.Token.KEYWORD)
-                              or node, f"'{node.keyword}' is a reserverd keyword.")
+            self.append_error(node.get_token(tokens.Token.KEYWORD) or node,
+                              f"'{node.keyword}' is a reserverd keyword.")
         self.generic_visit(node)
 
 
@@ -426,7 +392,7 @@ def collect_analysis_errors(completion_context: ICompletionContext):
     errors = []
     collector = _KeywordsCollector()
     collect_keywords(completion_context, collector)
-    
+
     ast = completion_context.get_ast()
     for keyword_usage_info in ast_utils.iter_keyword_usage_tokens(ast):
         completion_context.check_cancelled()
@@ -461,8 +427,7 @@ def collect_analysis_errors(completion_context: ICompletionContext):
         if len(errors) >= MAX_ERRORS:
             # i.e.: Collect at most 100 errors
             break
-
-    #errors += ErrorVisitor.find_from(ast)
+    
     errors += CodeAnalysisVisitor.find_from(completion_context)
 
     return errors

@@ -31,7 +31,7 @@ from concurrent import futures
 from robocorp_ls_core.basic import implements
 from robocorp_ls_core.protocols import IEndPoint, IFuture
 from robocorp_ls_core.jsonrpc.monitor import Monitor
-from typing import Optional
+from typing import Optional, Union
 
 log = get_logger(__name__)
 JSONRPC_VERSION = "2.0"
@@ -48,7 +48,7 @@ def require_monitor(func):
     return func
 
 
-class Endpoint(object):
+class Endpoint(IEndPoint):
 
     SHOW_THREAD_DUMP_AFTER_TIMEOUT = 5
 

@@ -8,9 +8,6 @@
 		},
 		{
 			"path": "example-vscode"
-		},
-		{
-			"path": "..\\..\\..\\Users\\daniel\\.virtualenvs\\robotframework-ls-eIJxjzm1\\src\\robotframework"
 		}
 	],
 	"settings": {

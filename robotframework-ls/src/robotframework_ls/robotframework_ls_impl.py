@@ -108,6 +108,9 @@ class _LintManager(object):
         curr_info = _CurrLintInfo(
             rf_lint_api_client, self._lsp_messages, doc_uri, is_saved
         )
+        
+        self._doc_id_to_info[doc_uri] = curr_info
+        
         from robocorp_ls_core.timeouts import TimeoutTracker
 
         timeout_tracker = TimeoutTracker.get_singleton()

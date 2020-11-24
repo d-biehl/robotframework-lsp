@@ -1,7 +1,8 @@
+from robocorp_ls_core.constants import Null
 from robocorp_ls_core.python_ls import PythonLanguageServer
 from robocorp_ls_core.basic import overrides
 from robocorp_ls_core.robotframework_log import get_logger
-from typing import Optional
+from typing import Optional, Union
 from robocorp_ls_core.protocols import IConfig, IMonitor
 from functools import partial
 from robocorp_ls_core.jsonrpc.endpoint import require_monitor
@@ -112,6 +113,7 @@ class RobotFrameworkServerApi(PythonLanguageServer):
 
             completion_context = self._create_completion_context(
                 doc_uri, 0, 0, monitor)
+
             if completion_context is None:
                 return []
 
@@ -128,8 +130,8 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             return [error.to_lsp_diagnostic() for error in errors]
         except JsonRpcRequestCancelled:
             raise JsonRpcRequestCancelled("Lint cancelled (inside lint)")
-        except:
-            log.exception("Error collecting errors.")
+        except Exception as e:
+            log.exception("Error collecting errors: %s", e)
             return []
 
     def m_complete_all(self, doc_uri, line, col):
@@ -266,7 +268,7 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             return []
         return [x.to_dict() for x in create_text_edit_from_diff(text, new_contents)]
 
-    def _create_completion_context(self, doc_uri, line, col, monitor: IMonitor):
+    def _create_completion_context(self, doc_uri, line, col, monitor: Union[IMonitor, Null, None]):
         from robotframework_ls.impl.completion_context import CompletionContext
 
         if not self._check_min_version((3, 2)):

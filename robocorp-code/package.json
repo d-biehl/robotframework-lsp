@@ -35,13 +35,17 @@
         "onCommand:robocorp.runInRcc.internal",
         "onCommand:robocorp.runRobotRcc",
         "onCommand:robocorp.debugRobotRcc",
+        "onCommand:robocorp.robotsViewTaskRun",
+        "onCommand:robocorp.robotsViewTaskDebug",
         "onCommand:robocorp.saveInDiskLRU",
         "onCommand:robocorp.loadFromDiskLRU",
         "onCommand:robocorp.computeRobotLaunchFromRobocorpCodeLaunch",
         "onCommand:robocorp.setPythonInterpreter",
         "onCommand:robocorp.resolveInterpreter",
+        "onCommand:robocorp.refreshRobotsView",
         "onDebugInitialConfigurations",
-        "onDebugResolve:robocorp-code"
+        "onDebugResolve:robocorp-code",
+        "onView:robocorp-robots-tree"
     ],
     "contributes": {
         "configuration": {
@@ -79,6 +83,24 @@
                     "description": "Specifies the config location used by rcc."
                 }
             }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "robocorp-robots",
+                    "title": "Robocorp Code",
+                    "icon": "images/robocorp-outline.svg"
+                }
+            ]
+        },
+        "views": {
+            "robocorp-robots": [
+                {
+                    "id": "robocorp-robots-tree",
+                    "name": "Robots",
+                    "contextualTitle": "Robots"
+                }
+            ]
         },
         "languages": [],
         "grammars": [],
@@ -153,11 +175,57 @@
                 "category": "Robocorp"
             },
             {
+                "command": "robocorp.robotsViewTaskRun",
+                "title": "Launch selected Task in Robots view",
+                "category": "Robocorp",
+                "icon": {
+                    "light": "images/light/run.svg",
+                    "dark": "images/dark/run.svg"
+                }
+            },
+            {
+                "command": "robocorp.robotsViewTaskDebug",
+                "title": "Debug selected Task in Robots view",
+                "category": "Robocorp",
+                "icon": {
+                    "light": "images/light/debug.svg",
+                    "dark": "images/dark/debug.svg"
+                }
+            },
+            {
                 "command": "robocorp.setPythonInterpreter",
-                "title": "Set python.pythonPath configuration (used by the Python extension) based on robot.yaml",
+                "title": "Set python.pythonPath config based on robot.yaml",
                 "category": "Robocorp"
+            },
+            {
+                "command": "robocorp.refreshRobotsView",
+                "title": "Refresh Robots view",
+                "category": "Robocorp",
+                "icon": {
+                    "light": "images/light/refresh.svg",
+                    "dark": "images/dark/refresh.svg"
+                }
             }
-        ]
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "robocorp.robotsViewTaskRun",
+                    "when": "view == robocorp-robots-tree && robocorp-code:single-task-selected",
+                    "group": "navigation"
+                },
+                {
+                    "command": "robocorp.robotsViewTaskDebug",
+                    "when": "view == robocorp-robots-tree && robocorp-code:single-task-selected",
+                    "group": "navigation"
+                },
+                {
+                    "command": "robocorp.refreshRobotsView",
+                    "when": "view == robocorp-robots-tree",
+                    "group": "navigation"
+                }
+            ]
+        }
     },
     "main": "./vscode-client/out/extension",
     "scripts": {

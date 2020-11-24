@@ -3,44 +3,6 @@ import { join } from 'path';
 import { OUTPUT_CHANNEL } from './channel';
 import * as roboCommands from './robocorpCommands';
 
-interface LocalRobotMetadataInfo {
-    name: string;
-    directory: string;
-    filePath: string;
-    yamlContents: object;
-};
-
-interface WorkspaceInfo {
-    workspaceName: string;
-    workspaceId: string;
-    packages: PackageInfo[];
-};
-
-interface PackageInfo {
-    workspaceId: string;
-    workspaceName: string;
-    id: string;
-    name: string;
-    sortKey: string;
-};
-
-interface ActionResult {
-    success: boolean;
-    message: string;
-    result: any;
-};
-
-interface InterpreterInfo {
-    pythonExe: string;
-    environ?: { [key: string]: string };
-    additionalPythonpathEntries: string[];
-}
-
-interface ListWorkspacesActionResult {
-    success: boolean;
-    message: string;
-    result: WorkspaceInfo[];
-};
 
 interface QuickPickItemWithAction extends QuickPickItem {
     action: any;
@@ -442,7 +404,7 @@ export async function uploadRobot() {
     } while (true);
 }
 
-export async function runRobotRCC(noDebug: boolean) {
+export async function askAndRunRobotRCC(noDebug: boolean) {
     let textEditor = window.activeTextEditor;
     let fileName: string | undefined = undefined;
 
@@ -519,12 +481,16 @@ export async function runRobotRCC(noDebug: boolean) {
         { 'name': RUN_IN_RCC_LRU_CACHE_NAME, 'entry': selectedItem.keyInLRU, 'lru_size': 3 }
     );
 
+    runRobotRCC(noDebug, selectedItem.robotYaml, selectedItem.taskName);
+}
+
+export async function runRobotRCC(noDebug: boolean, robotYaml: string, taskName: string) {
     let debugConfiguration: DebugConfiguration = {
         'name': 'Config',
         'type': 'robocorp-code',
         'request': 'launch',
-        'robot': selectedItem.robotYaml,
-        'task': selectedItem.taskName,
+        'robot': robotYaml,
+        'task': taskName,
         'args': [],
         'noDebug': noDebug,
     };

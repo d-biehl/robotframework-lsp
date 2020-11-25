@@ -1,4 +1,4 @@
-from typing import Any, Union, List
+from typing import Any, Tuple, Union, List
 
 from robot.variables import is_scalar_assign
 from robot.parsing.model.blocks import FirstStatementFinder, LastStatementFinder
@@ -179,7 +179,7 @@ def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token,
                         start_token.col_offset) if start_token else (-1, -1),
                  end=(end_token.lineno - 1,
                       end_token.end_col_offset) if end_token else (-1, -1),
-                 source=source)
+                 source=source or "robotframework_lsp")
 
 
 def create_error_from_statements(start_statement: statements.Statement, end_statement: statements.Statement, message: str, source=None) -> Error:
@@ -205,64 +205,58 @@ def create_error(block_statement_token: Union[blocks.Block, statements.Statement
     return create_error_from_statements(block_statement_token, block_statement_token, message, source)
 
 
-class FindEmptyIfBlocksVisitor(CompletionContextModelVisitor):
+class AnalyseIfBlockVisitor(CompletionContextModelVisitor):
 
     def __init__(self, model, completion_context: ICompletionContext = None):
         super().__init__(completion_context)
-        self.result = []
+        self.result: List[Tuple[Any, str]] = []
         self.model = model
-        self.current_branch = None
-        self.current_branch_name = "IF"
-        self.is_empty = True
+        self.else_branches = []
         self.else_has_seen = False
 
     @classmethod
     def find_from(cls, model, completion_context: ICompletionContext = None):
-        finder = cls(model.body, completion_context)
-        finder.current_branch = model
-        finder.visit(model.body)
-        finder.check_is_empty()
+        finder = cls(model, completion_context)
+
+        finder.visit(model)
+
         return finder.result
 
-    def visit_EmptyLine(self, node):
-        pass
+    def append_error(self, node, message):
+        self.result.append((node, message))
 
-    def visit_Comment(self, node):
-        pass
+    def visit_If(self, node):
+        if not node.body or IsEmptyVisitor.find_from(node.body, self.completion_context):
+            self.append_error(node.header or node,
+                              f"{node.type} has empty body.")
 
-    def check_is_empty(self):
-        if self.is_empty:
-            self.result.append(
-                (self.current_branch, f"{self.current_branch_name} has empty branch."))
-        self.is_empty = True
+        self.visit(node.header)
 
-    def visit_ElseIfStatement(self, node):
-        self.check_is_empty()
-        self.current_branch = node
-        self.current_branch_name = "ELSE IF"
+        if node.orelse:
+            self.visit(node.orelse)
+
+    def visit_IfHeader(self, node):
+        if not node.condition:
+            self.append_error(node, "IF has no condition.")
+
+    def visit_ElseIfHeader(self, node):
+        if not node.condition:
+            self.append_error(node, "ELSE IF has no condition.")
+
         if self.else_has_seen:
-            self.result.append(
-                (self.current_branch, "'ELSE IF' after 'ELSE'."))
+            self.append_error(node, "ELSE IF after 'ELSE'.")
 
-    def visit_Else(self, node):
-        self.check_is_empty()
-        self.current_branch = node
-        self.current_branch_name = "ELSE"
+    def visit_ElseHeader(self, node):
+        if node.get_tokens(tokens.Token.ARGUMENT):
+            self.append_error(node, "ELSE has condition.")
+        
         if self.else_has_seen:
-            self.result.append(
-                (self.current_branch, "Multiple 'ELSE' branches."))
+            for e in self.else_branches:
+                self.append_error(e, "Multiple ELSE branches.")    
+            self.append_error(node, "Multiple ELSE branches.")
+
+        self.else_branches.append(node)
         self.else_has_seen = True
-
-    def visit_list(self, node) -> Any:
-        if self.model == node:
-            for n in node:
-                self.visit(n)
-
-    def generic_visit(self, node) -> Any:
-        if self.model == node:
-            super().generic_visit(node)
-        else:
-            self.is_empty = False
 
 
 class CodeAnalysisVisitor(CompletionContextModelVisitor):
@@ -280,7 +274,11 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
     def append_error(self, node: Union[blocks.Block, statements.Statement, tokens.Token], message: str, source=None):
         self.errors.append(create_error(node, message, source))
 
+    # for compatiblity with older versions of robot
     def visit_ForLoopHeader(self, node):
+        self.visit_ForHeader(node)
+
+    def visit_ForHeader(self, node):
         if not node.variables:
             self.append_error(node, 'FOR loop has no loop variables.')
         else:
@@ -299,7 +297,11 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
         self.generic_visit(node)
 
+    # for compatiblity with older versions of robot
     def visit_ForLoop(self, node):
+        self.visit_For(node)
+
+    def visit_For(self, node):
         if not node.body or IsEmptyVisitor.find_from(node.body, self.completion_context):
             self.append_error(node.header or node, 'FOR loop has empty body.')
         if not node.end:
@@ -308,27 +310,14 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
         self.generic_visit(node)
 
-    def visit_IfStatement(self, node):
-        if not node.value:
-            self.append_error(node, 'IF has no expression.')
+    def visit_If(self, node):
+        if node.type == "IF":
+            for n, msg in AnalyseIfBlockVisitor.find_from(node, self.completion_context):
+                self.append_error(n or node.header or node, msg)
 
-        self.generic_visit(node)
-
-    def visit_ElseIfStatement(self, node):
-        if not node.value:
-            self.append_error(node, 'ELSE IF has no expression.')
-
-        self.generic_visit(node)
-
-    def visit_IfBlock(self, node):
-        if not node.body:
-            self.append_error(node.header or node, 'IF has empty branch.')
-
-        for n, msg in FindEmptyIfBlocksVisitor.find_from(node, self.completion_context):
-            self.append_error(n or node.header or node, msg)
-
-        if not node.end:
-            self.append_error(node.header or node, "IF has no closing 'END'.")
+            if not node.end:
+                self.append_error(node.header or node,
+                                  "IF has no closing 'END'.")
 
         self.generic_visit(node)
 
@@ -427,7 +416,7 @@ def collect_analysis_errors(completion_context: ICompletionContext):
         if len(errors) >= MAX_ERRORS:
             # i.e.: Collect at most 100 errors
             break
-    
+
     errors += CodeAnalysisVisitor.find_from(completion_context)
 
     return errors

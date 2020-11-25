@@ -1,13 +1,31 @@
 // A launch configuration that compiles the extension and then opens it inside a new window
 {
     "version": "0.1.0",
-    "configurations": [
+    "configurations": [        
         {
-            "name": "Python: Modul",
+            "name": "Python: Modul Language Server",
             "type": "python",
             "request": "launch",
             "module": "robotframework_ls",
-            "args": ["-v", "--tcp", "--port", "15561"],
+            "args": [
+                "-v",
+                "--tcp",
+                "--port",
+                "15561"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Language Server",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/robotframework_ls/__main__.py",
+            "args": [
+                "-v",
+                "--tcp",
+                "--port",
+                "15561"
+            ],
             "justMyCode": false
         },
         {

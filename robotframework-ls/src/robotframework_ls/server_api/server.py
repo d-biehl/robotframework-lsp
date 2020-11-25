@@ -124,11 +124,13 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             errors = collect_errors(ast)
             log.debug("Collected AST errors (in thread): %s", len(errors))
             monitor.check_cancelled()
+
             analysis_errors = code_analysis.collect_analysis_errors(
                 completion_context)
             log.debug("Collected analysis errors (in thread): %s",
                       len(analysis_errors))
             errors.extend(analysis_errors)
+
             return [error.to_lsp_diagnostic() for error in errors]
         except JsonRpcRequestCancelled:
             raise JsonRpcRequestCancelled("Lint cancelled (inside lint)")

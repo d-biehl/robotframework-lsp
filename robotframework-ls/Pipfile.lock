@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f473a9b45889c40168073aa67560f31a0e1af53a476c3fd36d0be14df673476a"
+            "sha256": "a4013b3a83a3bc0be192f9a4365cd59f7d4d99737072ce2416cdbb7a2af75d11"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -15,12 +15,8 @@
     },
     "default": {
         "robotframework": {
-            "hashes": [
-                "sha256:a0786a916d0572bd9d6afe26e95c6021e3df5dcafa0ece6b302e36366e58c24e",
-                "sha256:a0c325e79dc6dcdaba0398db8c3afefc337799b7b36b336f04b07be4fe4a9dd2"
-            ],
-            "index": "pypi",
-            "version": "==3.2.2"
+            "git": "https://github.com/robotframework/robotframework.git",
+            "ref": "cc69739c3b2a5434b8f2549a8d1d3b1ede441335"
         },
         "robotframework-lsp": {
             "editable": true,

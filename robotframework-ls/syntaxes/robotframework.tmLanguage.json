@@ -464,7 +464,7 @@
                     "include": "#line_continuation"
                 }
             ],
-            "name": "meta.end.robot"
+            "name": "meta.for.robot"
         },
         "for_operator": {
             "begin": "(?<=\\s)(IN ENUMERATE|IN RANGE|IN ZIP|IN)",
@@ -492,7 +492,7 @@
                     "include": "#comment"
                 }
             ],
-            "name": "meta.for.header.operator.robot"
+            "name": "meta.for.operator.robot"
         },
         "IF": {
             "end": "^(?!\\s*\\.\\.\\.)",
@@ -539,7 +539,7 @@
                     "include": "#line_continuation"
                 }
             ],
-            "name": "meta.else_if.robot"
+            "name": "meta.else.robot"
         },              
         "ELSE_IF": {
             "end": "^(?!\\s*\\.\\.\\.)",

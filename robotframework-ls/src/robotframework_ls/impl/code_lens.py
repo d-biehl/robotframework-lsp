@@ -6,7 +6,7 @@ from robocorp_ls_core.lsp import CodeLens, Command, Range, Position
 
 from robotframework_ls.impl.protocols import ICompletionContext
 
-from .robot_visitors import CompletionContextModelVisitor
+from robotframework_ls.impl.robot_visitors import CompletionContextModelVisitor
 
 
 class CodeLensVisitor(CompletionContextModelVisitor):

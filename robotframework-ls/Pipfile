@@ -8,7 +8,6 @@ flake8 = "*"
 mypy = "*"
 pylint = "*"
 autopep8 = "*"
-
 pytest = "*"
 pytest_timeout = "*"
 mock = "*"
@@ -17,6 +16,6 @@ pytest-xdist = "*"
 psutil = "*"
 
 [packages]
-robotframework = "*"
+robotframework = {git = "https://github.com/robotframework/robotframework.git"}
 watchdog = {editable = true, path = "./../robocorp-python-ls-core/src"}
 robotframework-lsp = {editable = true, path = "./src"}

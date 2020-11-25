@@ -1,17 +1,24 @@
 from collections import namedtuple
 import os
+from os.path import abspath
+from subprocess import run
 import sys
+import tempfile
 import threading
 from typing import Dict, Generator
 import hashlib
 
+from typing import Optional
+import multiprocessing
+
 from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
 
-
 from robotframework_ls.impl.protocols import ILibspecManager
 from robotframework_ls.impl.robot_specbuilder import LibraryDoc
-from typing import Optional
+
+from robotframework_ls.impl.generate_libdoc import run_doc
+
 
 log = get_logger(__name__)
 
@@ -143,7 +150,8 @@ def _load_spec_filename_additional_info(spec_filename):
         with open(additional_info_filename, "r") as stream:
             return json.load(stream)
     except BaseException as e:
-        log.exception("Unable to load source mtimes from: %s\n%s", spec_filename, e)
+        log.exception("Unable to load source mtimes from: %s\n%s",
+                      spec_filename, e)
         return {}
 
 
@@ -709,15 +717,18 @@ class LibspecManager(ILibspecManager):
         iter_in = []
         for (_uri, info) in self._workspace_folder_uri_to_folder_info.items():
             if info.libspec_canonical_filename_to_info:
-                iter_in.append((info.libspec_canonical_filename_to_info, False))
+                iter_in.append(
+                    (info.libspec_canonical_filename_to_info, False))
 
         for (_uri, info) in self._pythonpath_folder_to_folder_info.items():
             if info.libspec_canonical_filename_to_info:
-                iter_in.append((info.libspec_canonical_filename_to_info, False))
+                iter_in.append(
+                    (info.libspec_canonical_filename_to_info, False))
 
         for (_uri, info) in self._additional_pythonpath_folder_to_folder_info.items():
             if info.libspec_canonical_filename_to_info:
-                iter_in.append((info.libspec_canonical_filename_to_info, False))
+                iter_in.append(
+                    (info.libspec_canonical_filename_to_info, False))
 
         for (_uri, info) in self._internal_folder_to_folder_info.items():
             if info.libspec_canonical_filename_to_info:
@@ -821,82 +832,84 @@ class LibspecManager(ILibspecManager):
                 if libspec_error_entry in self.libspec_errors:
                     del self.libspec_errors[libspec_error_entry]
 
-                # remove old
-                if os.path.exists(libspec_filename):
-                    log.info("remove old spec file %s", libspec_filename)
-                    os.remove(libspec_filename)
-                    additional_libspec_filename = _get_additional_info_filename(
-                        libspec_filename)
-                    if os.path.exists(additional_libspec_filename):
-                        os.remove(additional_libspec_filename)
-
-                # Could fail.
                 with timed_acquire_mutex(_get_libspec_mutex_name(libspec_filename)):
-                    log.debug(
-                        f"Obtained mutex to generate libpsec: {libspec_filename}."
-                    )
-                    call.append(libspec_filename)
-
-                    mtime = -1
                     try:
-                        mtime = os.path.getmtime(libspec_filename)
-                    except BaseException:
-                        pass
+                        # run_doc(libname, libspec_filename, additional_path, additional_pythonpath_entries)
+                        import concurrent.futures as futures
 
-                    log.debug(
-                        "Generating libspec for: %s.\nCwd:%s\nCommand line:\n%s",
-                        libname,
-                        cwd,
-                        " ".join(call),
-                    )
-                    try:
-                        try:
-                            # Note: stdout is always subprocess.PIPE in this call.
-                            subprocess.check_output(
-                                call,
-                                stderr=subprocess.STDOUT,
-                                stdin=subprocess.PIPE,
-                                env=env,
-                                cwd=cwd,
-                            )
-                        except OSError as e:
-                            log.exception("Error calling: %s\n%s", call, e)
-                            # We may have something as: Ignore OSError: [WinError 6] The handle is invalid,
-                            # give the result based on whether the file changed on disk.
-                            try:
-                                if mtime != os.path.getmtime(libspec_filename):
-                                    _dump_spec_filename_additional_info(
-                                        libspec_filename,
-                                        is_builtin=is_builtin,
-                                        obtain_mutex=False,
-                                        arguments=arguments, alias=alias
-                                    )
-                                    return True
-                            except BaseException:
-                                pass
+                        # remove old
+                        if os.path.exists(libspec_filename):
+                            log.info("remove old spec file %s",
+                                     libspec_filename)
+                            os.remove(libspec_filename)
+                            additional_libspec_filename = _get_additional_info_filename(
+                                libspec_filename)
+                            if os.path.exists(additional_libspec_filename):
+                                os.remove(additional_libspec_filename)
 
-                            log.debug("Not retrying after OSError failure.")
-                            return False
+                        max_workers = min(10, (os.cpu_count() or 1) + 4)
+                        thread_pool = futures.ThreadPoolExecutor(
+                            max_workers=max_workers)
 
-                    except subprocess.CalledProcessError as e:
-                        log.exception(
-                            "Error creating libspec: %s. Output:\n%s", libname, e.output)
+                        # TODO define builtin vars
+                        variables = {
+                            "${CURDIR}": additional_path,
+                            "${TEMPDIR}": abspath(tempfile.gettempdir()),
+                            "${EXECDIR}": abspath("."),
 
-                        s = e.output.decode()
+                            "${/}": os.sep,
+                            "${:}": os.pathsep,
+                            "${\\n}": os.linesep,
 
-                        # strip the traceback part from output
-                        # self.libspec_errors[libspec_error_entry] = s[:s.rfind('Try --help for usage information.')].strip()
-                        self.libspec_errors[libspec_error_entry] = s[:s.find(
-                            'Traceback')].strip()
+                            '${SPACE}': ' ',
+                            '${True}': True,
+                            '${False}': False,
+                            '${None}': None,
+                            '${null}': None,
 
-                        return False
-                    _dump_spec_filename_additional_info(
-                        libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias
-                    )
+                            "${TEST NAME}": None,
+                            "@{TEST TAGS}": [],
+                            "${TEST DOCUMENTATION}": None,
+                            "${TEST STATUS}": None,
+                            "${TEST MESSAGE}": None,
+                            "${PREV TEST NAME}": None,
+                            "${PREV TEST STATUS}": None,
+                            "${PREV TEST MESSAGE}": None,
+                            "${SUITE NAME}": None,
+                            "${SUITE SOURCE}": None,
+                            "${SUITE DOCUMENTATION}": None,
+                            "&{SUITE METADATA}": {},
+                            "${SUITE STATUS}": None,
+                            "${SUITE MESSAGE}": None,
+                            "${KEYWORD STATUS}": None,
+                            "${KEYWORD MESSAGE}": None,
+                            "${LOG LEVEL}": None,
+                            "${OUTPUT FILE}": None,
+                            "${LOG FILE}": None,
+                            "${REPORT FILE}": None,
+                            "${DEBUG FILE}": None,
+                            "${OUTPUT DIR}": None,
+                        }
+
+                        future = thread_pool.submit(
+                            run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
+
+                        _, error = future.result()
+                        if error is not None:
+                            self.libspec_errors[libspec_error_entry] = error
+                        else:
+                            _dump_spec_filename_additional_info(
+                                libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias)
+                    except BaseException as e:
+                        self.libspec_errors[libspec_error_entry] = str(e)
+                        raise
+
                     return True
-            except Exception:
-                log.exception("Error creating libspec: %s", libname)
+            except Exception as e:
+                log.exception("Error creating libspec: %s\n%s", libname, e)
+
                 return False
+
         finally:
             if log_time:
                 delta = time.time() - curtime

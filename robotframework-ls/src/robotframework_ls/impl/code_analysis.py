@@ -249,10 +249,10 @@ class AnalyseIfBlockVisitor(CompletionContextModelVisitor):
     def visit_ElseHeader(self, node):
         if node.get_tokens(tokens.Token.ARGUMENT):
             self.append_error(node, "ELSE has condition.")
-        
+
         if self.else_has_seen:
             for e in self.else_branches:
-                self.append_error(e, "Multiple ELSE branches.")    
+                self.append_error(e, "Multiple ELSE branches.")
             self.append_error(node, "Multiple ELSE branches.")
 
         self.else_branches.append(node)
@@ -285,7 +285,7 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
             for var in [t for t in node.tokens if t.type in tokens.Token.VARIABLE]:
                 if not is_scalar_assign(var.value):
                     self.append_error(
-                        var, f"Invalid loop variable {var.value}.")
+                        var, f"FOR loop has invalid loop variable '{var.value}'.")
 
         if not node.flavor:
             self.append_error(
@@ -417,6 +417,6 @@ def collect_analysis_errors(completion_context: ICompletionContext):
             # i.e.: Collect at most 100 errors
             break
 
-    errors += CodeAnalysisVisitor.find_from(completion_context)
+    errors.extend(CodeAnalysisVisitor.find_from(completion_context))
 
     return errors

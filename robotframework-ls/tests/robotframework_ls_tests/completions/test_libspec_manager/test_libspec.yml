@@ -4,13 +4,10 @@
     default_value: '10'
     is_keyword_arg: false
     is_star_arg: false
-  doc: '<p>:param a: This is the parameter a.</p>'
+  doc: ':param a: This is the parameter a.'
   docs_and_format:
-  - ':param a: This is the parameter a.
-
-
-    '
-  - markdown
+  - ':param a: This is the parameter a.'
+  - ROBOT
   lineno: 2
   name: Method
   tags: []
@@ -23,7 +20,7 @@
   doc: ''
   docs_and_format:
   - ''
-  - markdown
+  - ROBOT
   lineno: 7
   name: Method 2
   tags: []
@@ -36,7 +33,7 @@
   doc: ''
   docs_and_format:
   - ''
-  - markdown
+  - ROBOT
   lineno: 10
   name: Method 3
   tags: []
@@ -59,7 +56,7 @@
   doc: ''
   docs_and_format:
   - ''
-  - markdown
+  - ROBOT
   lineno: 13
   name: Method 4
   tags: []
@@ -82,7 +79,7 @@
   doc: ''
   docs_and_format:
   - ''
-  - markdown
+  - ROBOT
   lineno: 16
   name: Method 5
   tags: []
@@ -90,7 +87,7 @@
   doc: ''
   docs_and_format:
   - ''
-  - markdown
+  - ROBOT
   lineno: 19
   name: Method 6
   tags: []

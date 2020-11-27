@@ -18,4 +18,4 @@ psutil = "*"
 [packages]
 watchdog = {editable = true, path = "./../robocorp-python-ls-core/src"}
 robotframework-lsp = {editable = true, path = "./src"}
-robotframework = "*"
+robotframework = {git = "https://github.com/robotframework/robotframework.git"}

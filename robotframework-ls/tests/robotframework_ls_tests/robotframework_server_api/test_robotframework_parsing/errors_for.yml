@@ -2,6 +2,7 @@
   - 3
   - 29
   msg: FOR loop has no closing END.
+  source: robotframework
   start:
   - 3
   - 0

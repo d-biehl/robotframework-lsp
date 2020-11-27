@@ -3,7 +3,7 @@
 
 
     '
-  documentationFormat: markdown
+  documentationFormat: plaintext
   insertText: Check With Multi Args    ${1:arg1}
   insertTextFormat: 2
   kind: 2
@@ -23,7 +23,7 @@
 
 
     '
-  documentationFormat: markdown
+  documentationFormat: plaintext
   insertText: Verify Another Model
   insertTextFormat: 2
   kind: 2
@@ -42,11 +42,8 @@
   documentation: 'Verify Model(model)
 
 
-    :type model: int
-
-
-    '
-  documentationFormat: markdown
+    :type model: int'
+  documentationFormat: plaintext
   insertText: Verify Model    ${1:model}
   insertTextFormat: 2
   kind: 2

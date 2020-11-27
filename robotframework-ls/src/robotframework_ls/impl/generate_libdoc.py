@@ -15,6 +15,27 @@ from robot.libdocpkg.robotbuilder import KeywordDocBuilder, LibraryDocBuilder, R
 from robot.libdocpkg.specbuilder import SpecDocBuilder
 from robot.utils.error import get_error_details
 
+    
+def get_robot_version():
+    try:
+        import robot
+
+        v = str(robot.get_version())
+    except BaseException:        
+        v = "unknown"
+    return v
+
+def get_robot_major_version():
+    robot_version = get_robot_version()
+
+    major_version = 3
+    try:
+        if "." in robot_version:
+            major_version = int(robot_version.split(".")[0])
+    except BaseException:
+        pass
+
+    return major_version
 
 def _LibraryDocumentation(library_or_resource, name=None, version=None,
                           doc_format=None, variables=None):
@@ -83,8 +104,8 @@ def run_doc(library_name: str, output_filename: str, additional_path: str, addit
 
         libdoc = _LibraryDocumentation(library_name, variables=vars)
 
-        libdoc.save(output_filename, "LIBSPEC")
-
+        libdoc.save(output_filename, "XML:HTML" if get_robot_major_version() < 4 else "LIBSPEC")
+        
         return (libdoc, None)
     except BaseException:
         msg, trace = get_error_details()

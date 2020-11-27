@@ -16,7 +16,36 @@ def hover(completion_context: ICompletionContext) -> Optional[dict]:
             from robocorp_ls_core.lsp import Hover
 
             keyword_found: IKeywordFound = keyword_definition.keyword_found
+            
+            signature_args = ""
+            for a in keyword_found.keyword_args:
+                if signature_args:
+                    signature_args +=", "
 
-            return Hover(keyword_found.docs).to_dict()
+                if a.is_keyword_arg:
+                    signature_args += "**"
+                if a.is_star_arg:
+                    signature_args += "*"
+
+                signature_args += a.arg_name
+
+                if a.arg_type:
+                    signature_args += f": {a.arg_type}"
+
+                if a.default_value:
+                    signature_args += f"={a.default_value}"
+
+            signature = f"{keyword_found.keyword_name}({signature_args})"
+
+            hover_text = "```python\n"
+            
+            hover_text += signature
+
+            hover_text += "\n```"
+
+            hover_text += "\n"
+            hover_text += keyword_found.docs 
+            
+            return Hover(hover_text).to_dict()
 
     return None

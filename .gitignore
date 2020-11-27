@@ -131,3 +131,17 @@ robotframework-ls/src/LICENSE
 robotframework-ls/src/README.md
 robotframework-ls/src/ThirdPartyNotices.txt
 robotframework-ls/src/robotframework_ls/vendored/robocode_ls_core/
+
+
+# pipenv
+Pipfile.lock
+
+.vscode/*
+#!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Local History for Visual Studio Code
+.history/

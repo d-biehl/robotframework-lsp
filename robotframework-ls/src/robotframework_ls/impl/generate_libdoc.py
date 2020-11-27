@@ -114,6 +114,6 @@ def run_doc(library_name: str, output_filename: str, additional_path: str, addit
         msg: str = get_error_message()
         if strip_traceback:
             msg = msg[:msg.find("Traceback")].strip()
-        return msg
+        return None, msg
     finally:
         sys.path = old_path

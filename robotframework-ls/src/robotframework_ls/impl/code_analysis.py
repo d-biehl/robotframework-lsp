@@ -1,10 +1,6 @@
-from typing import Any, Tuple, Union, List
+from typing import Any, Tuple, List
 
 from robot.variables import is_scalar_assign
-from robot.parsing.model.blocks import FirstStatementFinder, LastStatementFinder
-import robot.parsing.model.blocks as blocks
-import robot.parsing.model.statements as statements
-import robot.parsing.lexer.tokens as tokens
 
 from robocorp_ls_core.lsp import Error
 from robocorp_ls_core.robotframework_log import get_logger
@@ -14,7 +10,7 @@ from robotframework_ls.impl.ast_utils import MAX_ERRORS, create_error_from_node
 from robotframework_ls.impl.collect_keywords import collect_keywords
 from robotframework_ls.impl.text_utilities import normalize_robot_name
 
-from .robot_visitors import CompletionContextModelVisitor, IsEmptyVisitor
+from robotframework_ls.impl.robot_visitors import CompletionContextModelVisitor, IsEmptyVisitor, FirstStatementFinder, LastStatementFinder
 
 log = get_logger(__name__)
 
@@ -170,7 +166,7 @@ class _KeywordsCollector(IKeywordCollector):
         return multi
 
 
-def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token, message: str, source=None) -> Error:
+def create_error_from_tokens(start_token, end_token, message: str, source=None) -> Error:
     if not end_token:
         end_token = start_token
 
@@ -182,7 +178,9 @@ def create_error_from_tokens(start_token: tokens.Token, end_token: tokens.Token,
                  source=source or "robotframework_lsp")
 
 
-def create_error_from_statements(start_statement: statements.Statement, end_statement: statements.Statement, message: str, source=None) -> Error:
+def create_error_from_statements(start_statement, end_statement, message: str, source=None) -> Error:
+    import robot.parsing.lexer.tokens as tokens
+
     start = next((t for t in start_statement.tokens if t.type not in tokens.Token.NON_DATA_TOKENS),
                  start_statement.tokens[0]) if start_statement is not None else None
 
@@ -192,7 +190,10 @@ def create_error_from_statements(start_statement: statements.Statement, end_stat
     return create_error_from_tokens(start, end, message, source)
 
 
-def create_error(block_statement_token: Union[blocks.Block, statements.Statement, tokens.Token], message: str, source=None):
+def create_error(block_statement_token, message: str, source=None):
+    import robot.parsing.model.blocks as blocks
+    import robot.parsing.lexer.tokens as tokens
+
     if isinstance(block_statement_token, tokens.Token):
         return create_error_from_tokens(block_statement_token, block_statement_token, message, source)
 
@@ -247,6 +248,8 @@ class AnalyseIfBlockVisitor(CompletionContextModelVisitor):
             self.append_error(node, "ELSE IF after 'ELSE'.")
 
     def visit_ElseHeader(self, node):
+        import robot.parsing.lexer.tokens as tokens
+
         if node.get_tokens(tokens.Token.ARGUMENT):
             self.append_error(node, "ELSE has condition.")
 
@@ -271,7 +274,7 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         finder.visit(completion_context.get_ast())
         return finder.errors
 
-    def append_error(self, node: Union[blocks.Block, statements.Statement, tokens.Token], message: str, source=None):
+    def append_error(self, node, message: str, source=None):
         self.errors.append(create_error(node, message, source))
 
     # for compatiblity with older versions of robot
@@ -279,6 +282,7 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         self.visit_ForHeader(node)
 
     def visit_ForHeader(self, node):
+        import robot.parsing.lexer.tokens as tokens
         if not node.variables:
             self.append_error(node, 'FOR loop has no loop variables.')
         else:
@@ -321,7 +325,9 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
         self.generic_visit(node)
 
-    def visit_LibraryImport(self, node: statements.LibraryImport):
+    def visit_LibraryImport(self, node):
+        import robot.parsing.lexer.tokens as tokens
+
         if node.name is not None:
             lib_info = self.completion_context.workspace.libspec_manager.get_library_info(
                 node.name, False, self.completion_context.doc.uri, arguments=node.args, alias=node.alias)
@@ -341,7 +347,8 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
         self.generic_visit(node)
 
-    def visit_ResourceImport(self, node: statements.ResourceImport):
+    def visit_ResourceImport(self, node):
+        import robot.parsing.lexer.tokens as tokens
         if node.name is not None:
             lib_info = self.completion_context.get_resource_import_as_doc(node)
             if lib_info is None:
@@ -352,21 +359,23 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
         self.generic_visit(node)
 
-    def visit_KeywordCall(self, node: statements.KeywordCall):
+    def visit_KeywordCall(self, node):
+        import robot.parsing.lexer.tokens as tokens
+
         if node.keyword and node.keyword.lower() in ["end", "if", "else if", "for"]:
             self.append_error(node.get_token(tokens.Token.KEYWORD) or node,
                               f"'{node.keyword}' is a reserverd keyword.")
         self.generic_visit(node)
 
 
-class ErrorVisitor(blocks.ModelVisitor):
-    def __init__(self):
-        super().__init__()
+class ErrorVisitor(CompletionContextModelVisitor):
+    def __init__(self, completion_context=None):
+        super().__init__(completion_context)
         self.errors = []
 
     @classmethod
-    def find_from(cls, model):
-        finder = cls()
+    def find_from(cls, model, completion_context=None):
+        finder = cls(completion_context)
         finder.visit(model)
         return finder.errors
 

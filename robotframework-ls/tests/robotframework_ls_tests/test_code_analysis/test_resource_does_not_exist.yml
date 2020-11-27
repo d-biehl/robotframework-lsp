@@ -8,7 +8,8 @@
       line: 1
   severity: 1
   source: robotframework_lsp
-- message: too many values to unpack (expected 2)
+- message: 'Importing test library ''DoesNotExist'' failed: ModuleNotFoundError: No
+    module named ''DoesNotExist'''
   range:
     end:
       character: 23

@@ -15,15 +15,16 @@ from robot.libdocpkg.robotbuilder import KeywordDocBuilder, LibraryDocBuilder, R
 from robot.libdocpkg.specbuilder import SpecDocBuilder
 from robot.utils.error import get_error_details
 
-    
+
 def get_robot_version():
     try:
         import robot
 
         v = str(robot.get_version())
-    except BaseException:        
+    except BaseException:
         v = "unknown"
     return v
+
 
 def get_robot_major_version():
     robot_version = get_robot_version()
@@ -36,6 +37,7 @@ def get_robot_major_version():
         pass
 
     return major_version
+
 
 def _LibraryDocumentation(library_or_resource, name=None, version=None,
                           doc_format=None, variables=None):
@@ -88,7 +90,7 @@ class _LibraryDocBuilder(LibraryDocBuilder):
         return libdoc
 
 
-def run_doc(library_name: str, output_filename: str, additional_path: str, additional_pythonpath_entries: List[str], variables: Dict[str, str]) -> Tuple[Optional[LibraryDoc], Optional[str]]:
+def run_doc(library_name: str, output_filename: str, additional_path: str, additional_pythonpath_entries: List[str], variables: Dict[str, str], strip_traceback = True) -> Tuple[Optional[LibraryDoc], Optional[str]]:
     old_path = sys.path
     try:
         if additional_pythonpath_entries:
@@ -104,12 +106,14 @@ def run_doc(library_name: str, output_filename: str, additional_path: str, addit
 
         libdoc = _LibraryDocumentation(library_name, variables=vars)
 
-        libdoc.save(output_filename, "XML:HTML" if get_robot_major_version() < 4 else "LIBSPEC")
-        
+        libdoc.save(output_filename,
+                    "XML:HTML" if get_robot_major_version() < 4 else "LIBSPEC")
+
         return (libdoc, None)
-    except BaseException:
-        msg, trace = get_error_details()
-        nl = "\n"
-        return None, f"{msg}{(nl+trace) if trace else ''}"
+    except BaseException as e:
+        msg: str = get_error_message()
+        if strip_traceback:
+            msg = msg[:msg.find("Traceback")].strip()
+        return msg
     finally:
         sys.path = old_path

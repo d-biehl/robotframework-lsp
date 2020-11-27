@@ -1,16 +1,16 @@
 - deprecated: false
-  documentation: 'Verify Another Model(model=10)
+  documentation: 'New Verify Model(new model)
 
 
-    '
-  documentationFormat: markdown
-  insertText: Verify Another Model
+    :type new_model: int'
+  documentationFormat: plaintext
+  insertText: New Verify Model    ${1:new model}
   insertTextFormat: 2
   kind: 2
-  label: Verify Another Model
+  label: New Verify Model
   preselect: false
   textEdit:
-    newText: Verify Another Model
+    newText: New Verify Model    ${1:new model}
     range:
       end:
         character: 10
@@ -19,21 +19,18 @@
         character: 4
         line: 7
 - deprecated: false
-  documentation: 'Verify Model(model)
-
-
-    :type model: int
+  documentation: 'new Verify Another Model(new model=10)
 
 
     '
-  documentationFormat: markdown
-  insertText: Verify Model    ${1:model}
+  documentationFormat: plaintext
+  insertText: new Verify Another Model
   insertTextFormat: 2
   kind: 2
-  label: Verify Model
+  label: new Verify Another Model
   preselect: false
   textEdit:
-    newText: Verify Model    ${1:model}
+    newText: new Verify Another Model
     range:
       end:
         character: 10

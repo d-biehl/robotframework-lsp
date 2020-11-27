@@ -41,7 +41,7 @@ def test_keyword_completions_changes_user_library(
     completions = keyword_completions.complete(
         CompletionContext(doc, workspace=workspace.ws)
     )
-    data_regression.check(completions, basename="keyword_completions_1")
+    data_regression.check(completions, basename="test_keyword_completions_changes_user_library")
 
     time.sleep(1)  # Make sure that the mtime changes enough in the filesystem
 
@@ -55,6 +55,7 @@ def verify_changes(model=10):
 """
     with open(library_py, "w") as stream:
         stream.write(contents)
+
     completions = keyword_completions.complete(
         CompletionContext(doc, workspace=workspace.ws)
     )
@@ -96,7 +97,7 @@ def test_keyword_completions_user_library(
     completions = keyword_completions.complete(
         CompletionContext(doc, workspace=workspace.ws)
     )
-    data_regression.check(completions, basename="keyword_completions_1")
+    data_regression.check(completions, basename="test_keyword_completions_user_library")
 
     # Now, let's put a .libspec file in the workspace and check whether
     # it has priority over the auto-generated spec file.

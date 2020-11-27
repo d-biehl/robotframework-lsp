@@ -848,58 +848,57 @@ class LibspecManager(ILibspecManager):
                                 os.remove(additional_libspec_filename)
 
                         max_workers = min(10, (os.cpu_count() or 1) + 4)
-                        thread_pool = futures.ThreadPoolExecutor(
-                            max_workers=max_workers)
+                        with futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
 
-                        # TODO define builtin vars
-                        variables = {
-                            "${CURDIR}": additional_path,
-                            "${TEMPDIR}": abspath(tempfile.gettempdir()),
-                            "${EXECDIR}": abspath("."),
+                            # TODO define builtin vars
+                            variables = {
+                                "${CURDIR}": additional_path,
+                                "${TEMPDIR}": abspath(tempfile.gettempdir()),
+                                "${EXECDIR}": abspath("."),
 
-                            "${/}": os.sep,
-                            "${:}": os.pathsep,
-                            "${\\n}": os.linesep,
+                                "${/}": os.sep,
+                                "${:}": os.pathsep,
+                                "${\\n}": os.linesep,
 
-                            '${SPACE}': ' ',
-                            '${True}': True,
-                            '${False}': False,
-                            '${None}': None,
-                            '${null}': None,
+                                '${SPACE}': ' ',
+                                '${True}': True,
+                                '${False}': False,
+                                '${None}': None,
+                                '${null}': None,
 
-                            "${TEST NAME}": None,
-                            "@{TEST TAGS}": [],
-                            "${TEST DOCUMENTATION}": None,
-                            "${TEST STATUS}": None,
-                            "${TEST MESSAGE}": None,
-                            "${PREV TEST NAME}": None,
-                            "${PREV TEST STATUS}": None,
-                            "${PREV TEST MESSAGE}": None,
-                            "${SUITE NAME}": None,
-                            "${SUITE SOURCE}": None,
-                            "${SUITE DOCUMENTATION}": None,
-                            "&{SUITE METADATA}": {},
-                            "${SUITE STATUS}": None,
-                            "${SUITE MESSAGE}": None,
-                            "${KEYWORD STATUS}": None,
-                            "${KEYWORD MESSAGE}": None,
-                            "${LOG LEVEL}": None,
-                            "${OUTPUT FILE}": None,
-                            "${LOG FILE}": None,
-                            "${REPORT FILE}": None,
-                            "${DEBUG FILE}": None,
-                            "${OUTPUT DIR}": None,
-                        }
+                                "${TEST NAME}": None,
+                                "@{TEST TAGS}": [],
+                                "${TEST DOCUMENTATION}": None,
+                                "${TEST STATUS}": None,
+                                "${TEST MESSAGE}": None,
+                                "${PREV TEST NAME}": None,
+                                "${PREV TEST STATUS}": None,
+                                "${PREV TEST MESSAGE}": None,
+                                "${SUITE NAME}": None,
+                                "${SUITE SOURCE}": None,
+                                "${SUITE DOCUMENTATION}": None,
+                                "&{SUITE METADATA}": {},
+                                "${SUITE STATUS}": None,
+                                "${SUITE MESSAGE}": None,
+                                "${KEYWORD STATUS}": None,
+                                "${KEYWORD MESSAGE}": None,
+                                "${LOG LEVEL}": None,
+                                "${OUTPUT FILE}": None,
+                                "${LOG FILE}": None,
+                                "${REPORT FILE}": None,
+                                "${DEBUG FILE}": None,
+                                "${OUTPUT DIR}": None,
+                            }
 
-                        future = thread_pool.submit(
-                            run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
+                            future = executor.submit(
+                                run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
 
-                        _, error = future.result()
-                        if error is not None:
-                            self.libspec_errors[libspec_error_entry] = error
-                        else:
-                            _dump_spec_filename_additional_info(
-                                libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias)
+                            _, error = future.result()
+                            if error is not None:
+                                self.libspec_errors[libspec_error_entry] = error
+                            else:
+                                _dump_spec_filename_additional_info(
+                                    libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias)
                     except BaseException as e:
                         self.libspec_errors[libspec_error_entry] = str(e)
                         raise

@@ -1,0 +1,43 @@
+- deprecated: false
+  documentation: 'Verify Another Model(model=10)
+
+
+    '
+  documentationFormat: markdown
+  insertText: Verify Another Model
+  insertTextFormat: 2
+  kind: 2
+  label: Verify Another Model
+  preselect: false
+  textEdit:
+    newText: Verify Another Model
+    range:
+      end:
+        character: 10
+        line: 7
+      start:
+        character: 4
+        line: 7
+- deprecated: false
+  documentation: 'Verify Model(model)
+
+
+    :type model: int
+
+
+    '
+  documentationFormat: markdown
+  insertText: Verify Model    ${1:model}
+  insertTextFormat: 2
+  kind: 2
+  label: Verify Model
+  preselect: false
+  textEdit:
+    newText: Verify Model    ${1:model}
+    range:
+      end:
+        character: 10
+        line: 7
+      start:
+        character: 4
+        line: 7

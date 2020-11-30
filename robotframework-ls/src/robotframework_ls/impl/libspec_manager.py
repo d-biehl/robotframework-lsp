@@ -1,15 +1,12 @@
 from collections import namedtuple
 import os
-from os.path import abspath
-from subprocess import run
+
 import sys
 import tempfile
 import threading
-from typing import Dict, Generator
+from typing import Dict, Generator, Optional
 import hashlib
-
-from typing import Optional
-import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
@@ -17,8 +14,7 @@ from robocorp_ls_core.robotframework_log import get_logger
 from robotframework_ls.impl.protocols import ILibspecManager
 from robotframework_ls.impl.robot_specbuilder import LibraryDoc
 
-from robotframework_ls.impl.generate_libdoc import run_doc
-
+from robocorp_ls_core.protocols import Sentinel
 
 log = get_logger(__name__)
 
@@ -295,9 +291,8 @@ class _FolderInfo(object):
                 from robocorp_ls_core.watchdog_wrapper import PathInfo
 
                 folder_path = self.folder_path
-                self._watch = observer.notify_on_extensions_change(
+                self._watch = observer.notify_on_any_change(
                     [PathInfo(folder_path, recursive=self.recursive)],
-                    ["libspec"],
                     notifier.on_change,
                     (self._on_change_spec,),
                 )
@@ -442,12 +437,14 @@ class LibspecManager(ILibspecManager):
 
         from robocorp_ls_core import watchdog_wrapper
 
+        self._libspec_failures_cache: Dict[tuple, bool] = {}
+
         self._main_thread = threading.current_thread()
 
         self._observer = watchdog_wrapper.create_observer()
 
-        self._spec_changes_notifier = watchdog_wrapper.create_notifier(
-            self._on_spec_file_changed, timeout=0.5
+        self._file_changes_notifier = watchdog_wrapper.create_notifier(
+            self._on_file_changed, timeout=0.5
         )
 
         self._root_uri = None
@@ -502,12 +499,20 @@ class LibspecManager(ILibspecManager):
 
         # Must be set from the outside world when needed.
         self.config = None
+        
+        self.process_executor = ProcessPoolExecutor()
+        self.thread_executor = ThreadPoolExecutor()
+
 
         log.debug("Generating builtin libraries.")
         self._gen_builtin_libraries()
         log.debug("Synchronizing internal caches.")
         self._synchronize()
         log.debug("Finished initializing LibspecManager.")
+
+    def __del__(self):
+        self.thread_executor.shutdown(False, cancel_futures=True)
+        self.process_executor.shutdown(False, cancel_futures=True)        
 
     def _check_in_main_thread(self):
         curr_thread = threading.current_thread()
@@ -553,9 +558,29 @@ class LibspecManager(ILibspecManager):
     def user_libspec_dir(self):
         return self._user_libspec_dir
 
-    def _on_spec_file_changed(self, spec_file, target):
+    def _on_file_changed(self, spec_file, folder_info_on_change_spec):
         log.debug("File change detected: %s", spec_file)
-        target(spec_file)
+
+        # Check if the cache related to libspec generation failure must be
+        # cleared.
+        fix = False
+        for cache_key in self._libspec_failures_cache:
+            libname = cache_key[0]
+            if libname in spec_file:
+                fix = True
+                break
+        if fix:
+            new = {}
+            for cache_key, value in self._libspec_failures_cache.items():
+                libname = cache_key[0]
+                if libname not in spec_file:
+                    new[cache_key] = value
+            # Always set as a whole (to avoid racing conditions).
+            self._libspec_failures_cache = new
+
+        # Notify _FolderInfo._on_change_spec
+        if spec_file.lower().endswith(".libspec"):
+            folder_info_on_change_spec(spec_file)
 
     def add_workspace_folder(self, folder_uri):
         self._check_in_main_thread()
@@ -569,7 +594,7 @@ class LibspecManager(ILibspecManager):
             )
             self._workspace_folder_uri_to_folder_info = cp
             folder_info.start_watch(
-                self._observer, self._spec_changes_notifier)
+                self._observer, self._file_changes_notifier)
             folder_info.synchronize()
         else:
             log.debug("Workspace folder already added: %s", folder_uri)
@@ -601,7 +626,7 @@ class LibspecManager(ILibspecManager):
                 real_path, recursive=True)
             self._additional_pythonpath_folder_to_folder_info = cp
             folder_info.start_watch(
-                self._observer, self._spec_changes_notifier)
+                self._observer, self._file_changes_notifier)
             folder_info.synchronize()
         else:
             log.debug(
@@ -625,50 +650,45 @@ class LibspecManager(ILibspecManager):
         """
 
         try:
-            import time
-            from concurrent import futures
+            import time            
             from robotframework_ls.impl import robot_constants
             from robocorp_ls_core.system_mutex import timed_acquire_mutex
             from robocorp_ls_core.system_mutex import generate_mutex_name
 
             initial_time = time.time()
             wait_for = []
-
-            max_workers = min(10, (os.cpu_count() or 1) + 4)
-            thread_pool = futures.ThreadPoolExecutor(max_workers=max_workers)
-
-            try:
-                log.debug("Waiting for mutex to generate builtins.")
-                with timed_acquire_mutex(
-                    generate_mutex_name(
-                        _norm_filename(self._builtins_libspec_dir),
-                        prefix="gen_builtins_",
-                    ),
-                    timeout=100,
-                ):
-                    log.debug("Obtained mutex to generate builtins.")
-                    for libname in robot_constants.STDLIBS:
-                        builtins_libspec_dir = self._builtins_libspec_dir
-                        if not os.path.exists(
-                            os.path.join(builtins_libspec_dir,
-                                         f"{libname}.libspec")
-                        ):
-                            wait_for.append(
-                                thread_pool.submit(
-                                    self._create_libspec, libname, is_builtin=True
-                                )
+                                
+            log.debug("Waiting for mutex to generate builtins.")
+            with timed_acquire_mutex(
+                generate_mutex_name(
+                    _norm_filename(self._builtins_libspec_dir),
+                    prefix="gen_builtins_",
+                ),
+                timeout=100,
+            ):
+                log.debug("Obtained mutex to generate builtins.")
+                for libname in robot_constants.STDLIBS:
+                    builtins_libspec_dir = self._builtins_libspec_dir
+                    if not os.path.exists(
+                        os.path.join(builtins_libspec_dir,
+                                    f"{libname}.libspec")
+                    ):
+                        wait_for.append(
+                            self.thread_executor.submit(
+                                self._create_libspec, libname, is_builtin=True
                             )
-                    for future in wait_for:
-                        future.result()
+                        )
+                        
+                for future in wait_for:
+                    future.result()
 
-                if wait_for:
-                    log.debug(
-                        "Total time to generate builtins: %.2fs"
-                        % (time.time() - initial_time)
-                    )
-                    self.synchronize_internal_libspec_folders()
-            finally:
-                thread_pool.shutdown(wait=False)
+            if wait_for:
+                log.debug(
+                    "Total time to generate builtins: %.2fs"
+                    % (time.time() - initial_time)
+                )
+                self.synchronize_internal_libspec_folders()
+        
         except BaseException:
             log.exception("Error creating builtin libraries.")
         finally:
@@ -677,25 +697,25 @@ class LibspecManager(ILibspecManager):
     def synchronize_workspace_folders(self):
         for folder_info in self._workspace_folder_uri_to_folder_info.values():
             folder_info.start_watch(
-                self._observer, self._spec_changes_notifier)
+                self._observer, self._file_changes_notifier)
             folder_info.synchronize()
 
     def synchronize_pythonpath_folders(self):
         for folder_info in self._pythonpath_folder_to_folder_info.values():
             folder_info.start_watch(
-                self._observer, self._spec_changes_notifier)
+                self._observer, self._file_changes_notifier)
             folder_info.synchronize()
 
     def synchronize_additional_pythonpath_folders(self):
         for folder_info in self._additional_pythonpath_folder_to_folder_info.values():
             folder_info.start_watch(
-                self._observer, self._spec_changes_notifier)
+                self._observer, self._file_changes_notifier)
             folder_info.synchronize()
 
     def synchronize_internal_libspec_folders(self):
         for folder_info in self._internal_folder_to_folder_info.values():
             folder_info.start_watch(
-                self._observer, self._spec_changes_notifier)
+                self._observer, self._file_changes_notifier)
             folder_info.synchronize()
 
     def _synchronize(self):
@@ -770,45 +790,49 @@ class LibspecManager(ILibspecManager):
         alias=None,
         current_doc_uri=None
     ):
+        cache_key = (
+            libname,
+            tuple(additional_path) if additional_path else additional_path,
+            is_builtin,
+            cwd,
+        )
+        not_created = self._libspec_failures_cache.get(
+            cache_key, Sentinel.SENTINEL)
+        if not_created is Sentinel.SENTINEL:
+            created = self._cached_create_libspec(
+                libname, env, log_time, cwd, additional_path, is_builtin, arguments, alias, current_doc_uri)
+            if not created:
+                # Always set as a whole (to avoid racing conditions).
+                cp = self._libspec_failures_cache.copy()
+                cp[cache_key] = False
+                self._libspec_failures_cache = cp
+
+        return not_created
+
+    def _cached_create_libspec(
+        self, libname, env, log_time, cwd, additional_path, is_builtin, arguments, alias, current_doc_uri
+    ):
         """
         :param str libname:
         :raise Exception: if unable to create the library.
         """
-        import time
-        from robotframework_ls.impl import robot_constants
-        from robocorp_ls_core.subprocess_wrapper import subprocess
+        import time        
+        from robotframework_ls.impl import robot_constants        
         from robocorp_ls_core.system_mutex import timed_acquire_mutex
+
+        from robotframework_ls.impl.generate_libdoc import run_doc
 
         curtime = time.time()
 
         try:
             try:
-                call = [sys.executable]
-                major_version = self.get_robot_major_version()
-                if major_version < 4:
-                    call.extend("-m robot.libdoc --format XML:HTML".split())
-                else:
-                    # Use default values for libspec (--format XML:HTML is deprecated).
-                    call.extend("-m robot.libdoc".split())
-
-                if additional_path:
-                    if os.path.exists(additional_path):
-                        call.extend(["-P", additional_path])
-
                 additional_pythonpath_entries = list(
                     [x.folder_path for x in self._additional_pythonpath_folder_to_folder_info.values()]
                 )
-                for entry in list(additional_pythonpath_entries):
-                    if os.path.exists(entry):
-                        call.extend(["-P", entry])
-
+              
                 libargs = "::".join(arguments) if arguments is not None and len(
                     arguments) > 0 else None
-                if libargs is not None:
-                    call.append(f"{libname}::{libargs}")
-                else:
-                    call.append(libname)
-
+              
                 libspec_dir = self._user_libspec_dir
                 if libname in robot_constants.STDLIBS:
                     libspec_dir = self._builtins_libspec_dir
@@ -823,20 +847,17 @@ class LibspecManager(ILibspecManager):
                 libspec_filename = os.path.join(
                     libspec_dir, encoded_libname + ".libspec")
 
-                log.debug(
-                    f"Obtaining mutex to generate libpsec: {libspec_filename}.")
-
                 libspec_error_entry = LibspecErrorEntry(
                     libname, arguments, alias, current_doc_uri)
 
                 if libspec_error_entry in self.libspec_errors:
                     del self.libspec_errors[libspec_error_entry]
 
+                log.debug(
+                    f"Obtaining mutex to generate libpsec: {libspec_filename}.")
+
                 with timed_acquire_mutex(_get_libspec_mutex_name(libspec_filename)):
                     try:
-                        # run_doc(libname, libspec_filename, additional_path, additional_pythonpath_entries)
-                        import concurrent.futures as futures
-
                         # remove old
                         if os.path.exists(libspec_filename):
                             log.info("remove old spec file %s",
@@ -846,59 +867,56 @@ class LibspecManager(ILibspecManager):
                                 libspec_filename)
                             if os.path.exists(additional_libspec_filename):
                                 os.remove(additional_libspec_filename)
+                        
+                        # TODO define builtin vars
+                        variables = {
+                            "${CURDIR}": additional_path,
+                            "${TEMPDIR}": os.path.abspath(tempfile.gettempdir()),
+                            "${EXECDIR}": os.path.abspath("."),
 
-                        max_workers = min(10, (os.cpu_count() or 1) + 4)
-                        with futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+                            "${/}": os.sep,
+                            "${:}": os.pathsep,
+                            "${\\n}": os.linesep,
 
-                            # TODO define builtin vars
-                            variables = {
-                                "${CURDIR}": additional_path,
-                                "${TEMPDIR}": abspath(tempfile.gettempdir()),
-                                "${EXECDIR}": abspath("."),
+                            '${SPACE}': ' ',
+                            '${True}': True,
+                            '${False}': False,
+                            '${None}': None,
+                            '${null}': None,
 
-                                "${/}": os.sep,
-                                "${:}": os.pathsep,
-                                "${\\n}": os.linesep,
+                            "${TEST NAME}": None,
+                            "@{TEST TAGS}": [],
+                            "${TEST DOCUMENTATION}": None,
+                            "${TEST STATUS}": None,
+                            "${TEST MESSAGE}": None,
+                            "${PREV TEST NAME}": None,
+                            "${PREV TEST STATUS}": None,
+                            "${PREV TEST MESSAGE}": None,
+                            "${SUITE NAME}": None,
+                            "${SUITE SOURCE}": None,
+                            "${SUITE DOCUMENTATION}": None,
+                            "&{SUITE METADATA}": {},
+                            "${SUITE STATUS}": None,
+                            "${SUITE MESSAGE}": None,
+                            "${KEYWORD STATUS}": None,
+                            "${KEYWORD MESSAGE}": None,
+                            "${LOG LEVEL}": None,
+                            "${OUTPUT FILE}": None,
+                            "${LOG FILE}": None,
+                            "${REPORT FILE}": None,
+                            "${DEBUG FILE}": None,
+                            "${OUTPUT DIR}": None,
+                        }
+                        
+                        future = self.process_executor.submit(
+                            run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
 
-                                '${SPACE}': ' ',
-                                '${True}': True,
-                                '${False}': False,
-                                '${None}': None,
-                                '${null}': None,
-
-                                "${TEST NAME}": None,
-                                "@{TEST TAGS}": [],
-                                "${TEST DOCUMENTATION}": None,
-                                "${TEST STATUS}": None,
-                                "${TEST MESSAGE}": None,
-                                "${PREV TEST NAME}": None,
-                                "${PREV TEST STATUS}": None,
-                                "${PREV TEST MESSAGE}": None,
-                                "${SUITE NAME}": None,
-                                "${SUITE SOURCE}": None,
-                                "${SUITE DOCUMENTATION}": None,
-                                "&{SUITE METADATA}": {},
-                                "${SUITE STATUS}": None,
-                                "${SUITE MESSAGE}": None,
-                                "${KEYWORD STATUS}": None,
-                                "${KEYWORD MESSAGE}": None,
-                                "${LOG LEVEL}": None,
-                                "${OUTPUT FILE}": None,
-                                "${LOG FILE}": None,
-                                "${REPORT FILE}": None,
-                                "${DEBUG FILE}": None,
-                                "${OUTPUT DIR}": None,
-                            }
-
-                            future = executor.submit(
-                                run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
-
-                            _, error = future.result()
-                            if error is not None:
-                                self.libspec_errors[libspec_error_entry] = error
-                            else:
-                                _dump_spec_filename_additional_info(
-                                    libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias)
+                        _, error = future.result(100)
+                        if error is not None:
+                            self.libspec_errors[libspec_error_entry] = error
+                        else:
+                            _dump_spec_filename_additional_info(
+                                libspec_filename, is_builtin=is_builtin, obtain_mutex=False, arguments=arguments, alias=alias)
                     except BaseException as e:
                         self.libspec_errors[libspec_error_entry] = str(e)
                         raise
@@ -917,7 +935,7 @@ class LibspecManager(ILibspecManager):
 
     def dispose(self):
         self._observer.dispose()
-        self._spec_changes_notifier.dispose()
+        self._file_changes_notifier.dispose()
 
     def _do_create_libspec_on_get(self, libname, current_doc_uri, arguments, alias):
         from robocorp_ls_core import uris

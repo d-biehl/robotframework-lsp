@@ -30,9 +30,7 @@ jobs:
     - name: Setup node
       uses: actions/setup-node@v1
       with:
-        node-version: 15.x
-    - name: Yarn install
-      run: yarn install
+        node-version: 14.x    
     - name: Set up Python 3.7
       uses: actions/setup-python@v1
       with:

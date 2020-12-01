@@ -9,6 +9,8 @@ from robocorp_ls_core.python_ls import PythonLanguageServer
 from robocorp_ls_core.basic import overrides
 from robocorp_ls_core.robotframework_log import get_logger
 
+from build.lib.robotframework_ls.impl.protocols import ILibspecManager
+
 
 log = get_logger(__name__)
 
@@ -20,7 +22,7 @@ class RobotFrameworkServerApi(PythonLanguageServer):
     an API to use the bits we need from robotframework in a separate process).
     """
 
-    def __init__(self, read_from, write_to, libspec_manager=None):
+    def __init__(self, read_from, write_to, libspec_manager: Optional[ILibspecManager] = None):
         from robotframework_ls.impl.libspec_manager import LibspecManager
 
         if libspec_manager is None:
@@ -128,7 +130,7 @@ class RobotFrameworkServerApi(PythonLanguageServer):
             analysis_errors = code_analysis.collect_analysis_errors(
                 completion_context)
             log.debug("Collected analysis errors (in thread): %s",
-                     len(analysis_errors))
+                      len(analysis_errors))
             errors.extend(analysis_errors)
 
             return [error.to_lsp_diagnostic() for error in errors]

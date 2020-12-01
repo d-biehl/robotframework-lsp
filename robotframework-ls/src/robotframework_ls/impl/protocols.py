@@ -12,7 +12,7 @@ from robocorp_ls_core.constants import NULL
 from collections import namedtuple
 from robotframework_ls.impl.robot_specbuilder import KeywordArg
 
-if sys.version_info[:2] < (3, 8):
+if sys.version_info < (3, 8):
 
     class Protocol(object):
         pass
@@ -31,24 +31,45 @@ KeywordUsageInfo = namedtuple("KeywordUsageInfo", "stack, node, token, name")
 
 class IRobotDocument(IDocument, Protocol):
     def get_type(self) -> str:
-        pass
+        ...
 
     def get_ast(self) -> Any:
-        pass
+        ...
 
     symbols_cache: Optional[list] = None
 
 
 class ILibspecManager(Protocol):
     def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=None, alias=None):
-        pass
+        ...
 
     def get_library_error(self, libname,  current_doc_uri=None, arguments=None, alias=None):
-        pass
+        ...
+
+    def add_workspace_folder(self, folder_uri: str):
+        ...
+
+    def remove_workspace_folder(self, folder_uri: str):
+        ...
+
+    @property
+    def root_uri(self) -> str:
+        ...
+
+    @root_uri.setter
+    def root_uri(self, value: str):
+        ...
 
 
 class IRobotWorkspace(IWorkspace, Protocol):
-    libspec_manager: ILibspecManager
+
+    @property
+    def libspec_manager(self) -> ILibspecManager:
+        ...
+
+    @libspec_manager.setter
+    def libspec_manager(self, value: ILibspecManager):
+        ...
 
 
 class IKeywordFound(Protocol):
@@ -174,32 +195,32 @@ class ICompletionContext(Protocol):
 
     @property
     def monitor(self) -> IMonitor:
-        pass
+        ...
 
     def check_cancelled(self):
-        pass
+        ...
 
     def create_copy_with_selection(self, line: int, col: int) -> "ICompletionContext":
-        pass
+        ...
 
     def create_copy(self, doc: IRobotDocument) -> "ICompletionContext":
-        pass
+        ...
 
     @property
     def original_doc(self) -> IRobotDocument:
-        pass
+        ...
 
     @property
     def original_sel(self) -> Any:
-        pass
+        ...
 
     @property
     def doc(self) -> IRobotDocument:
-        pass
+        ...
 
     @property
     def sel(self) -> IDocumentSelection:
-        pass
+        ...
 
     @property
     def memo(self) -> Any:
@@ -211,13 +232,13 @@ class ICompletionContext(Protocol):
 
     @property
     def workspace(self) -> IRobotWorkspace:
-        pass
+        ...
 
     def get_type(self) -> Any:
-        pass
+        ...
 
     def get_ast(self) -> Any:
-        pass
+        ...
 
     def get_ast_current_section(self) -> Any:
         """
@@ -225,19 +246,19 @@ class ICompletionContext(Protocol):
         """
 
     def get_accepted_section_header_words(self) -> List[str]:
-        pass
+        ...
 
     def get_current_section_name(self) -> Optional[str]:
-        pass
+        ...
 
     def get_current_token(self) -> Optional[TokenInfo]:
-        pass
+        ...
 
     def get_current_variable(self, section=None) -> Optional[TokenInfo]:
-        pass
+        ...
 
     def get_resource_import_as_doc(self, resource_import) -> Optional[IRobotDocument]:
-        pass
+        ...
 
     def get_current_keyword_definition(self) -> Optional[IKeywordDefinition]:
-        pass
+        ...

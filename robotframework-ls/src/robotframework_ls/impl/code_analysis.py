@@ -1,8 +1,8 @@
-from typing import Any, Tuple, List
+from typing import Any, Tuple, List, cast
 
 from robot.variables import is_scalar_assign
 
-from robocorp_ls_core.lsp import Error
+from robocorp_ls_core.lsp import DiagnosticSeverity, Error
 from robocorp_ls_core.robotframework_log import get_logger
 from robotframework_ls.impl.protocols import ICompletionContext, IKeywordCollector
 from robotframework_ls.impl import ast_utils
@@ -166,7 +166,7 @@ class _KeywordsCollector(IKeywordCollector):
         return multi
 
 
-def create_error_from_tokens(start_token, end_token, message: str, source=None) -> Error:
+def create_error_from_tokens(start_token, end_token, message: str, source=None, severity=DiagnosticSeverity.Error) -> Error:
     if not end_token:
         end_token = start_token
 
@@ -175,10 +175,10 @@ def create_error_from_tokens(start_token, end_token, message: str, source=None) 
                         start_token.col_offset) if start_token else (-1, -1),
                  end=(end_token.lineno - 1,
                       end_token.end_col_offset) if end_token else (-1, -1),
-                 source=source or "robotframework_lsp")
+                 source=source or "robotframework_lsp", severity=severity)
 
 
-def create_error_from_statements(start_statement, end_statement, message: str, source=None) -> Error:
+def create_error_from_statements(start_statement, end_statement, message: str, source=None, severity=DiagnosticSeverity.Error) -> Error:
     import robot.parsing.lexer.tokens as tokens
 
     start = next((t for t in start_statement.tokens if t.type not in tokens.Token.NON_DATA_TOKENS),
@@ -187,23 +187,23 @@ def create_error_from_statements(start_statement, end_statement, message: str, s
     end = next((t for t in reversed(end_statement.tokens)
                 if t.type not in tokens.Token.NON_DATA_TOKENS), end_statement.tokens[-1]) if end_statement is not None else None
 
-    return create_error_from_tokens(start, end, message, source)
+    return create_error_from_tokens(start, end, message, source, severity)
 
 
-def create_error(block_statement_token, message: str, source=None):
+def create_error(block_statement_token, message: str, source=None, severity=DiagnosticSeverity.Error):
     import robot.parsing.model.blocks as blocks
     import robot.parsing.lexer.tokens as tokens
 
     if isinstance(block_statement_token, tokens.Token):
-        return create_error_from_tokens(block_statement_token, block_statement_token, message, source)
+        return create_error_from_tokens(block_statement_token, block_statement_token, message, source, severity)
 
     if isinstance(block_statement_token, blocks.Block):
         first_statement = FirstStatementFinder.find_from(block_statement_token)
         last_statement = LastStatementFinder.find_from(block_statement_token)
 
-        return create_error_from_statements(first_statement, last_statement, message, source)
+        return create_error_from_statements(first_statement, last_statement, message, source, severity)
 
-    return create_error_from_statements(block_statement_token, block_statement_token, message, source)
+    return create_error_from_statements(block_statement_token, block_statement_token, message, source, severity)
 
 
 class AnalyseIfBlockVisitor(CompletionContextModelVisitor):
@@ -274,8 +274,8 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
         finder.visit(completion_context.get_ast())
         return finder.errors
 
-    def append_error(self, node, message: str, source=None):
-        self.errors.append(create_error(node, message, source))
+    def append_error(self, node, message: str, source=None, severity=DiagnosticSeverity.Error):
+        self.errors.append(create_error(node, message, source, severity))
 
     # for compatiblity with older versions of robot
     def visit_ForLoopHeader(self, node):
@@ -327,10 +327,12 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
 
     def visit_LibraryImport(self, node):
         import robot.parsing.lexer.tokens as tokens
+        from .robot_specbuilder import LibraryDoc
 
         if node.name is not None:
-            lib_info = self.completion_context.workspace.libspec_manager.get_library_info(
-                node.name, False, self.completion_context.doc.uri, arguments=node.args, alias=node.alias)
+            lib_info = cast(LibraryDoc, self.completion_context.workspace.libspec_manager.get_library_info(
+                node.name, False, self.completion_context.doc.uri, arguments=node.args, alias=node.alias))
+
             if lib_info is None:
 
                 self.append_error(node.get_token(
@@ -341,7 +343,9 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
                 if libdoc_error is not None:
                     self.append_error(node.get_token(
                         tokens.Token.NAME) or node, libdoc_error, source="robot.libdoc")
-
+            else:
+                if not lib_info.keywords:
+                    self.append_error(node.get_token(tokens.Token.NAME) or node, f"Imported library '{node.name}' contains no keywords.", severity= DiagnosticSeverity.Warning)
         else:
             self.append_error(node, "Library setting requires value.")
 

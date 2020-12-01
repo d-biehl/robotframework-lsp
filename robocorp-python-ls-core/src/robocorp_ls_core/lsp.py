@@ -488,9 +488,9 @@ class LSPMessages(object):
 
 class Error(object):
 
-    __slots__ = "msg start end source".split(" ")
+    __slots__ = "msg start end source severity".split(" ")
 
-    def __init__(self, msg, start, end, source=None):
+    def __init__(self, msg, start, end, source=None, severity = DiagnosticSeverity.Error):
         """
         Note: `start` and `end` are tuples with (line, col).
         """
@@ -498,6 +498,7 @@ class Error(object):
         self.start = start
         self.end = end
         self.source = source or "robotframework"
+        self.severity = severity
 
     def to_dict(self):
         return dict((name, getattr(self, name)) for name in self.__slots__)
@@ -515,7 +516,7 @@ class Error(object):
                 "start": {"line": self.start[0], "character": self.start[1]},
                 "end": {"line": self.end[0], "character": self.end[1]},
             },
-            "severity": DiagnosticSeverity.Error,
+            "severity": self.severity,
             "source": self.source,
             "message": self.msg,
         }

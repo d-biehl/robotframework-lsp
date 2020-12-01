@@ -582,7 +582,7 @@ class LibspecManager(ILibspecManager):
         if spec_file.lower().endswith(".libspec"):
             folder_info_on_change_spec(spec_file)
 
-    def add_workspace_folder(self, folder_uri):
+    def add_workspace_folder(self, folder_uri: str):
         self._check_in_main_thread()
         from robocorp_ls_core import uris
 
@@ -599,7 +599,7 @@ class LibspecManager(ILibspecManager):
         else:
             log.debug("Workspace folder already added: %s", folder_uri)
 
-    def remove_workspace_folder(self, folder_uri):
+    def remove_workspace_folder(self, folder_uri: str):
         self._check_in_main_thread()
         if folder_uri in self._workspace_folder_uri_to_folder_info:
             log.debug("Removed workspace folder: %s", folder_uri)
@@ -772,7 +772,7 @@ class LibspecManager(ILibspecManager):
                 # some cases we may create libraries for namespace packages
                 # (i.e.: empty folders) which don't really have anything -- in
                 # this case, this isn't a valid library.
-                if (info is not None and info.library_doc is not None and info.library_doc.keywords):
+                if (info is not None and info.library_doc is not None):
                     yield info
 
     def get_library_names(self):
@@ -841,9 +841,7 @@ class LibspecManager(ILibspecManager):
                 if libargs is not None:
                     digest = hashlib.sha256(libargs.encode()).hexdigest()[:8]
                     encoded_libname += f"__{digest}"
-
-                # libspec_filename = os.path.join(
-                #     libspec_dir, urllib.parse.quote(encoded_libname) + ".libspec")
+               
                 libspec_filename = os.path.join(
                     libspec_dir, encoded_libname + ".libspec")
 

@@ -2,7 +2,7 @@ import sys
 
 from robocorp_ls_core.protocols import IConfig, IDirCache, IEndPoint
 
-if sys.version_info[:2] < (3, 8):
+if sys.version_info < (3, 8):
 
     class Protocol(object):
         pass
@@ -18,7 +18,7 @@ else:
 class EPConfigurationProvider(Protocol):
     @property
     def config(self) -> IConfig:
-        pass
+        ...
 
 
 class DefaultConfigurationProvider(object):
@@ -32,7 +32,7 @@ class DefaultConfigurationProvider(object):
 class EPDirCacheProvider(Protocol):
     @property
     def dir_cache(self) -> IDirCache:
-        pass
+        ...
 
 
 class DefaultDirCacheProvider(object):
@@ -46,7 +46,7 @@ class DefaultDirCacheProvider(object):
 class EPEndPointProvider(Protocol):
     @property
     def endpoint(self) -> IEndPoint:
-        pass
+        ...
 
 
 class DefaultEndPointProvider(object):

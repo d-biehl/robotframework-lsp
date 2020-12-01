@@ -171,7 +171,7 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     @overrides(PythonLanguageServer._create_workspace)
     def _create_workspace(self, root_uri, workspace_folders):
         from robotframework_ls.impl.robot_workspace import RobotWorkspace
-
+        
         return RobotWorkspace(root_uri, workspace_folders, generate_ast=False)
 
     def m_initialize(

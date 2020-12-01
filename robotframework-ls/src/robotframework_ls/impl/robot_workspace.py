@@ -1,9 +1,10 @@
+from typing import Optional
 from robocorp_ls_core.workspace import Workspace, Document
 from robocorp_ls_core.basic import overrides
 from robocorp_ls_core.cache import instance_cache
 from robotframework_ls.constants import NULL
 from robocorp_ls_core.robotframework_log import get_logger
-from robotframework_ls.impl.protocols import IRobotWorkspace, IRobotDocument
+from robotframework_ls.impl.protocols import ILibspecManager, IRobotWorkspace, IRobotDocument
 from robocorp_ls_core.protocols import check_implements
 
 log = get_logger(__name__)
@@ -11,24 +12,34 @@ log = get_logger(__name__)
 
 class RobotWorkspace(Workspace):
     def __init__(
-        self, root_uri, workspace_folders=None, libspec_manager=NULL, generate_ast=True
+        self, root_uri, workspace_folders=None, libspec_manager: Optional[ILibspecManager] = None, generate_ast=True
     ):
-        self.libspec_manager = libspec_manager
+        self._libspec_manager = libspec_manager
 
         Workspace.__init__(self, root_uri, workspace_folders=workspace_folders)
         if self.libspec_manager is not None:
             self.libspec_manager.root_uri = root_uri
         self._generate_ast = generate_ast
 
+    @property
+    def libspec_manager(self) -> Optional[ILibspecManager]:
+        return self._libspec_manager
+
+    @libspec_manager.setter
+    def libspec_manager(self, value: Optional[ILibspecManager]):
+        self._libspec_manager = value
+
     @overrides(Workspace.add_folder)
     def add_folder(self, folder):
         Workspace.add_folder(self, folder)
-        self.libspec_manager.add_workspace_folder(folder.uri)
+        if self.libspec_manager is not None:
+            self.libspec_manager.add_workspace_folder(folder.uri)
 
     @overrides(Workspace.remove_folder)
     def remove_folder(self, folder_uri):
         Workspace.remove_folder(self, folder_uri)
-        self.libspec_manager.remove_workspace_folder(folder_uri)
+        if self.libspec_manager is not None:
+            self.libspec_manager.remove_workspace_folder(folder_uri)
 
     def _create_document(self, doc_uri, source=None, version=None):
         return RobotDocument(doc_uri, source, version, generate_ast=self._generate_ast)
@@ -105,7 +116,7 @@ class RobotDocument(Document):
         """
         :param contents:
             The contents to be found.
-            
+
         :return:
             The 0-based index of the contents.
         """

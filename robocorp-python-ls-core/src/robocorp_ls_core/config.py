@@ -38,7 +38,7 @@ def flatten_keys(d: dict, parent_key="", all_options=frozenset(), result_dict=No
     return result_dict
 
 
-class Config(object):
+class Config(IConfig):
     ALL_OPTIONS: FrozenSet[str] = frozenset()
 
     def __init__(self, all_options: FrozenSet[str] = frozenset()):

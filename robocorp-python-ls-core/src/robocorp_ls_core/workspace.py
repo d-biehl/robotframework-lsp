@@ -31,7 +31,7 @@ import threading
 log = get_logger(__name__)
 
 
-class Workspace(object):
+class Workspace(IWorkspace):
     """
     Note: only a single thread can mutate the workspace, but multiple threads
     may read from it.

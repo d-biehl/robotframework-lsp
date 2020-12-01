@@ -238,7 +238,7 @@ def _collect_completions_from_ast(
             )
 
 
-def _collect_current_doc_keywords(completion_context, collector):
+def _collect_current_doc_keywords(completion_context: ICompletionContext, collector):
     """
     :param CompletionContext completion_context:
     """
@@ -251,7 +251,7 @@ def _collect_current_doc_keywords(completion_context, collector):
 _LibInfo = namedtuple("_LibInfo", "name, alias, args")
 
 
-def _collect_libraries_keywords(completion_context, collector):
+def _collect_libraries_keywords(completion_context: ICompletionContext, collector):
     """
     :param CompletionContext completion_context:
     """
@@ -296,7 +296,7 @@ def _collect_libraries_keywords(completion_context, collector):
                     )
 
 
-def _collect_resource_imports_keywords(completion_context, collector):
+def _collect_resource_imports_keywords(completion_context: ICompletionContext, collector):
     """
     :param CompletionContext completion_context:
     """
@@ -305,7 +305,7 @@ def _collect_resource_imports_keywords(completion_context, collector):
         _collect_following_imports(new_ctx, collector)
 
 
-def _collect_following_imports(completion_context, collector):
+def _collect_following_imports(completion_context: ICompletionContext, collector):
     completion_context.check_cancelled()
     if completion_context.memo.follow_import(completion_context.doc.uri):
         # i.e.: prevent collecting keywords for the same doc more than once.

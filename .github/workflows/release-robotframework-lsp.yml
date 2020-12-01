@@ -54,8 +54,8 @@ jobs:
       with:
         name: robotframework-lsp.vsix
         path: ./robotframework-ls/robotframework-lsp.vsix
-    # - name: Check tag version
-    #   run: python -m dev check-tag-version
+    - name: Check tag version
+      run: python -m dev check-tag-version
     # - name: Upload to PyPI
     #   working-directory: ./robotframework-ls/src
     #   run: twine upload dist/*
@@ -66,3 +66,7 @@ jobs:
     #   run: vsce publish -p $VSCE_TOKEN
     #   env:
     #     VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+    # - name: Publish to open vsx marketplace 
+    #   run: npx ovsx publish robotframework-lsp.vsix -p $OPEN_VSX_TOKEN
+    #   env:
+    #     OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}

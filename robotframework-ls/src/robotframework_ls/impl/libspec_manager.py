@@ -809,8 +809,23 @@ class LibspecManager(ILibspecManager):
 
         return not_created
 
+    def _subprocess_check_output(self, *args, **kwargs):
+        # Only done for mocking.
+        from robocorp_ls_core.subprocess_wrapper import subprocess
+
+        return subprocess.check_output(*args, **kwargs)
+
     def _cached_create_libspec(
-        self, libname, env, log_time, cwd, additional_path, is_builtin, arguments, alias, current_doc_uri
+        self,
+        libname,
+        env,
+        log_time,
+        cwd,
+        additional_path,
+        is_builtin,
+        arguments, alias, current_doc_uri,
+        *,
+        _internal_force_text=False,  # Should only be set from within this function.
     ):
         """
         :param str libname:
@@ -821,6 +836,10 @@ class LibspecManager(ILibspecManager):
         from robocorp_ls_core.system_mutex import timed_acquire_mutex
 
         from robotframework_ls.impl.generate_libdoc import run_doc
+        
+        if _internal_force_text:
+            # In this case this is a recursive call and we already have the lock.
+            timed_acquire_mutex = NULL
 
         curtime = time.time()
 
@@ -854,6 +873,46 @@ class LibspecManager(ILibspecManager):
                 log.debug(
                     f"Obtaining mutex to generate libpsec: {libspec_filename}.")
 
+                # TODO define builtin vars
+                variables = {
+                    "${CURDIR}": additional_path,
+                    "${TEMPDIR}": os.path.abspath(tempfile.gettempdir()),
+                    "${EXECDIR}": os.path.abspath("."),
+
+                    "${/}": os.sep,
+                    "${:}": os.pathsep,
+                    "${\\n}": os.linesep,
+
+                    '${SPACE}': ' ',
+                    '${True}': True,
+                    '${False}': False,
+                    '${None}': None,
+                    '${null}': None,
+
+                    "${TEST NAME}": None,
+                    "@{TEST TAGS}": [],
+                    "${TEST DOCUMENTATION}": None,
+                    "${TEST STATUS}": None,
+                    "${TEST MESSAGE}": None,
+                    "${PREV TEST NAME}": None,
+                    "${PREV TEST STATUS}": None,
+                    "${PREV TEST MESSAGE}": None,
+                    "${SUITE NAME}": None,
+                    "${SUITE SOURCE}": None,
+                    "${SUITE DOCUMENTATION}": None,
+                    "&{SUITE METADATA}": {},
+                    "${SUITE STATUS}": None,
+                    "${SUITE MESSAGE}": None,
+                    "${KEYWORD STATUS}": None,
+                    "${KEYWORD MESSAGE}": None,
+                    "${LOG LEVEL}": None,
+                    "${OUTPUT FILE}": None,
+                    "${LOG FILE}": None,
+                    "${REPORT FILE}": None,
+                    "${DEBUG FILE}": None,
+                    "${OUTPUT DIR}": None,
+                }
+
                 with timed_acquire_mutex(_get_libspec_mutex_name(libspec_filename)):
                     try:
                         # remove old
@@ -865,47 +924,7 @@ class LibspecManager(ILibspecManager):
                                 libspec_filename)
                             if os.path.exists(additional_libspec_filename):
                                 os.remove(additional_libspec_filename)
-                        
-                        # TODO define builtin vars
-                        variables = {
-                            "${CURDIR}": additional_path,
-                            "${TEMPDIR}": os.path.abspath(tempfile.gettempdir()),
-                            "${EXECDIR}": os.path.abspath("."),
-
-                            "${/}": os.sep,
-                            "${:}": os.pathsep,
-                            "${\\n}": os.linesep,
-
-                            '${SPACE}': ' ',
-                            '${True}': True,
-                            '${False}': False,
-                            '${None}': None,
-                            '${null}': None,
-
-                            "${TEST NAME}": None,
-                            "@{TEST TAGS}": [],
-                            "${TEST DOCUMENTATION}": None,
-                            "${TEST STATUS}": None,
-                            "${TEST MESSAGE}": None,
-                            "${PREV TEST NAME}": None,
-                            "${PREV TEST STATUS}": None,
-                            "${PREV TEST MESSAGE}": None,
-                            "${SUITE NAME}": None,
-                            "${SUITE SOURCE}": None,
-                            "${SUITE DOCUMENTATION}": None,
-                            "&{SUITE METADATA}": {},
-                            "${SUITE STATUS}": None,
-                            "${SUITE MESSAGE}": None,
-                            "${KEYWORD STATUS}": None,
-                            "${KEYWORD MESSAGE}": None,
-                            "${LOG LEVEL}": None,
-                            "${OUTPUT FILE}": None,
-                            "${LOG FILE}": None,
-                            "${REPORT FILE}": None,
-                            "${DEBUG FILE}": None,
-                            "${OUTPUT DIR}": None,
-                        }
-                        
+                                                                     
                         future = self.process_executor.submit(
                             run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
 

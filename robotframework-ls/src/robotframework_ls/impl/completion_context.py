@@ -3,7 +3,7 @@ from robocorp_ls_core.constants import NULL, Null
 from robocorp_ls_core.protocols import IMonitor, Sentinel, IConfig, IDocumentSelection
 from robocorp_ls_core.robotframework_log import get_logger
 from robotframework_ls.impl.robot_workspace import RobotDocument
-from typing import Union, Optional, Any, List
+from typing import Union, Optional, Any, List, cast
 from robotframework_ls.impl.protocols import (
     IRobotDocument,
     ICompletionContext,
@@ -420,7 +420,8 @@ class CompletionContext(ICompletionContext):
 
         token_info = self.get_current_token()
         if token_info is not None:
-            cp: ICompletionContext = self
+            cp = cast(ICompletionContext, self)
+            
             while token_info.token.type == token_info.token.EOL:
                 sel = cp.sel
                 if sel.col > 0:

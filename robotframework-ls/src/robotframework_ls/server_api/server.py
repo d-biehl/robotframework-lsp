@@ -9,7 +9,7 @@ from robocorp_ls_core.python_ls import PythonLanguageServer
 from robocorp_ls_core.basic import overrides
 from robocorp_ls_core.robotframework_log import get_logger
 
-from build.lib.robotframework_ls.impl.protocols import ILibspecManager
+from robotframework_ls.impl.protocols import ILibspecManager
 
 
 log = get_logger(__name__)

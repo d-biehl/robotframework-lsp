@@ -342,10 +342,16 @@ class CodeAnalysisVisitor(CompletionContextModelVisitor):
                     node.name, self.completion_context.doc.uri, node.args, node.alias)
                 if libdoc_error is not None:
                     self.append_error(node.get_token(
-                        tokens.Token.NAME) or node, libdoc_error, source="robot.libdoc")
+                        tokens.Token.NAME) or node, libdoc_error, source="robot.libdoc")              
             else:
                 if not lib_info.keywords:
                     self.append_error(node.get_token(tokens.Token.NAME) or node, f"Imported library '{node.name}' contains no keywords.", severity= DiagnosticSeverity.Warning)
+                
+                libdoc_warning = self.completion_context.workspace.libspec_manager.get_library_warning(
+                    node.name, self.completion_context.doc.uri, node.args, node.alias)
+                if libdoc_warning is not None:
+                    self.append_error(node.get_token(
+                        tokens.Token.NAME) or node, libdoc_warning, source="robot.libdoc", severity=DiagnosticSeverity.Hint)
         else:
             self.append_error(node, "Library setting requires value.")
 

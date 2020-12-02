@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict
 
 from robotframework_ls.impl.protocols import ICompletionContext
-from .robot_visitors import CompletionContextModelVisitor
+from robotframework_ls.impl.robot_visitors import CompletionContextModelVisitor
 
 from robocorp_ls_core.lsp import FoldingRange
 

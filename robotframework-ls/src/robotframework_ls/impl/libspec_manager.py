@@ -208,13 +208,10 @@ class _LibInfo(object):
     @property
     def alias(self):
         return self.additional_info.get(_ALIAS, None)
-    
+
     @property
     def arguments(self):
         return tuple(self.additional_info.get(_ARGUMENTS, None) or [])
-
-    def __str__(self):
-        return f"_LibInfo({self._canonical_spec_filename}, {self.library_doc}, {self.mtime}, {self.arguments})"
 
     def verify_sources_sync(self, arguments, alias):
         """
@@ -371,6 +368,10 @@ class _FolderInfo(object):
         return new_libspec_filename_to_info
 
 
+def dummy_process():
+    pass
+
+
 class LibspecManager(ILibspecManager):
     """
     Used to manage the libspec files.
@@ -424,17 +425,13 @@ class LibspecManager(ILibspecManager):
         v = cls.get_robot_version()
 
         # Note: _v1: information on the mtime of the libspec sources now available.
-        return os.path.join(home, "specs", cls.INTERNAL_VERSION, "%s_%s" % (digest, v))
+        return os.path.join(home, "specs", "%s_%s" % (digest, v))
 
     @classmethod
     def get_internal_builtins_libspec_dir(cls, internal_libspec_dir=None):
         return os.path.join(
             internal_libspec_dir or cls.get_internal_libspec_dir(), "builtins"
         )
-
-    # On v2 we disambiguate by using a hash for the filenames if we're generating
-    # a libspec for a target filename.
-    INTERNAL_VERSION = "v2"
 
     def __init__(self, builtin_libspec_dir=None, user_libspec_dir=None):
         """
@@ -480,6 +477,7 @@ class LibspecManager(ILibspecManager):
             pass
 
         self.libspec_errors: Dict[LibspecErrorEntry, str] = {}
+        self.libspec_warnings: Dict[LibspecErrorEntry, str] = {}
 
         # Spec info found in the workspace
         self._workspace_folder_uri_to_folder_info = {}
@@ -506,10 +504,15 @@ class LibspecManager(ILibspecManager):
 
         # Must be set from the outside world when needed.
         self.config = None
-        
-        self.process_executor = ProcessPoolExecutor()
-        self.thread_executor = ThreadPoolExecutor()
 
+        self.process_pool = ProcessPoolExecutor()
+
+        # we have to submit a dummy process to start the process pool,
+        # because it does not start correctly if we do it from another
+        # thread
+        self.process_pool.submit(dummy_process).result()
+
+        self.thread_pool = ThreadPoolExecutor()
 
         log.debug("Generating builtin libraries.")
         self._gen_builtin_libraries()
@@ -518,8 +521,8 @@ class LibspecManager(ILibspecManager):
         log.debug("Finished initializing LibspecManager.")
 
     def __del__(self):
-        self.thread_executor.shutdown(False, cancel_futures=True)
-        self.process_executor.shutdown(False, cancel_futures=True)        
+        self.thread_pool.shutdown(False, cancel_futures=True)
+        self.process_pool.shutdown(False, cancel_futures=True)
 
     def _check_in_main_thread(self):
         curr_thread = threading.current_thread()
@@ -657,14 +660,14 @@ class LibspecManager(ILibspecManager):
         """
 
         try:
-            import time            
+            import time
             from robotframework_ls.impl import robot_constants
             from robocorp_ls_core.system_mutex import timed_acquire_mutex
             from robocorp_ls_core.system_mutex import generate_mutex_name
 
             initial_time = time.time()
             wait_for = []
-                                
+
             log.debug("Waiting for mutex to generate builtins.")
             with timed_acquire_mutex(
                 generate_mutex_name(
@@ -678,14 +681,14 @@ class LibspecManager(ILibspecManager):
                     builtins_libspec_dir = self._builtins_libspec_dir
                     if not os.path.exists(
                         os.path.join(builtins_libspec_dir,
-                                    f"{libname}.libspec")
+                                     f"{libname}.libspec")
                     ):
                         wait_for.append(
-                            self.thread_executor.submit(
+                            self.thread_pool.submit(
                                 self._create_libspec, libname, is_builtin=True
                             )
                         )
-                        
+
                 for future in wait_for:
                     future.result()
 
@@ -695,7 +698,7 @@ class LibspecManager(ILibspecManager):
                     % (time.time() - initial_time)
                 )
                 self.synchronize_internal_libspec_folders()
-        
+
         except BaseException:
             log.exception("Error creating builtin libraries.")
         finally:
@@ -783,7 +786,6 @@ class LibspecManager(ILibspecManager):
                     yield info
 
     def get_library_names(self):
-<<<<<<< HEAD
         return sorted(set(lib_info.library_doc.name for lib_info in self._iter_lib_info()))
 
     def _create_libspec(
@@ -798,35 +800,13 @@ class LibspecManager(ILibspecManager):
         alias=None,
         current_doc_uri=None
     ):
-        cache_key = (
-            libname,
-            tuple(additional_path) if additional_path else additional_path,
-            is_builtin,
-            cwd,
-        )
+        cache_key = (libname, is_builtin, arguments)
+
         not_created = self._libspec_failures_cache.get(
             cache_key, Sentinel.SENTINEL)
         if not_created is Sentinel.SENTINEL:
             created = self._cached_create_libspec(
                 libname, env, log_time, cwd, additional_path, is_builtin, arguments, alias, current_doc_uri)
-=======
-        return sorted(
-            set(lib_info.library_doc.name for lib_info in self.iter_lib_info())
-        )
-
-    def _create_libspec(
-        self, libname, *, is_builtin=False, target_file: Optional[str] = None
-    ):
-        """
-        :param target_file:
-            If given this is the library file (i.e.: c:/foo/bar.py) which is the
-            actual library we're creating the spec for.
-        """
-        cache_key = (libname, is_builtin, target_file)
-        not_created = self._libspec_failures_cache.get(cache_key, Sentinel.SENTINEL)
-        if not_created is Sentinel.SENTINEL:
-            created = self._cached_create_libspec(libname, is_builtin, target_file)
->>>>>>> upstream/master
             if not created:
                 # Always set as a whole (to avoid racing conditions).
                 cp = self._libspec_failures_cache.copy()
@@ -847,81 +827,40 @@ class LibspecManager(ILibspecManager):
         env,
         log_time,
         cwd,
-        additional_path,        
-        arguments, alias, current_doc_uri,
-        is_builtin: bool,
-        target_file: Optional[str],
-        *,
-        _internal_force_text=False,  # Should only be set from within this function.
+        additional_path,
+        is_builtin,
+        arguments, alias, current_doc_uri
     ):
         """
         :param str libname:
         :raise Exception: if unable to create the library.
         """
-        import time        
-        from robotframework_ls.impl import robot_constants        
+        import time
+        from robotframework_ls.impl import robot_constants
         from robocorp_ls_core.system_mutex import timed_acquire_mutex
-
+        from multiprocessing import Process
         from robotframework_ls.impl.generate_libdoc import run_doc
-        
-        if _internal_force_text:
-            # In this case this is a recursive call and we already have the lock.
-            timed_acquire_mutex = NULL
-
-        additional_path = None
-        additional_path_exists = False
-
-        log_time = True
-        cwd = None
-
-        if target_file is not None:
-            additional_path = os.path.dirname(target_file)
-            additional_path_exists = os.path.exists(additional_path)
-            if additional_path and additional_path_exists:
-                cwd = additional_path
-            libname = os.path.basename(libname)
-            if libname.lower().endswith((".py", ".class", ".java")):
-                libname = os.path.splitext(libname)[0]
 
         curtime = time.time()
 
         try:
             try:
-<<<<<<< HEAD
-=======
-                call = [sys.executable]
-                major_version = self.get_robot_major_version()
-                if major_version < 4:
-                    call.extend("-m robot.libdoc --format XML:HTML".split())
-                else:
-                    # Use default values for libspec (--format XML:HTML is deprecated).
-                    call.extend("-m robot.libdoc".split())
-
-                if additional_path and additional_path_exists:
-                    call.extend(["-P", additional_path])
-
-                if _internal_force_text:
-                    call.append("--docformat")
-                    call.append("text")
-
->>>>>>> upstream/master
                 additional_pythonpath_entries = list(
                     [x.folder_path for x in self._additional_pythonpath_folder_to_folder_info.values()]
                 )
-              
+
                 libargs = "::".join(arguments) if arguments is not None and len(
                     arguments) > 0 else None
-              
+
                 libspec_dir = self._user_libspec_dir
                 if libname in robot_constants.STDLIBS:
                     libspec_dir = self._builtins_libspec_dir
 
-<<<<<<< HEAD
                 encoded_libname = libname
                 if libargs is not None:
                     digest = hashlib.sha256(libargs.encode()).hexdigest()[:8]
                     encoded_libname += f"__{digest}"
-               
+
                 libspec_filename = os.path.join(
                     libspec_dir, encoded_libname + ".libspec")
 
@@ -930,6 +869,9 @@ class LibspecManager(ILibspecManager):
 
                 if libspec_error_entry in self.libspec_errors:
                     del self.libspec_errors[libspec_error_entry]
+
+                if libspec_error_entry in self.libspec_warnings:
+                    del self.libspec_warnings[libspec_error_entry]
 
                 log.debug(
                     f"Obtaining mutex to generate libpsec: {libspec_filename}.")
@@ -985,11 +927,14 @@ class LibspecManager(ILibspecManager):
                                 libspec_filename)
                             if os.path.exists(additional_libspec_filename):
                                 os.remove(additional_libspec_filename)
-                                                                     
-                        future = self.process_executor.submit(
+
+                        future = self.process_pool.submit(
                             run_doc, f"{libname}{f'::{libargs}' if libargs else ''}", libspec_filename, additional_path, additional_pythonpath_entries, variables)
 
-                        _, error = future.result(100)
+                        _, error, warning = future.result(100)
+
+                        if warning is not None:
+                            self.libspec_warnings[libspec_error_entry] = warning
                         if error is not None:
                             self.libspec_errors[libspec_error_entry] = error
                         else:
@@ -999,92 +944,6 @@ class LibspecManager(ILibspecManager):
                         self.libspec_errors[libspec_error_entry] = str(e)
                         raise
 
-=======
-                if target_file:
-                    import hashlib
-
-                    digest = hashlib.sha256(
-                        target_file.encode("utf-8", "replace")
-                    ).hexdigest()[:8]
-
-                    libspec_filename = os.path.join(libspec_dir, digest + ".libspec")
-                else:
-                    libspec_filename = os.path.join(libspec_dir, libname + ".libspec")
-
-                log.debug(f"Obtaining mutex to generate libpsec: {libspec_filename}.")
-                with timed_acquire_mutex(
-                    _get_libspec_mutex_name(libspec_filename)
-                ):  # Could fail.
-                    log.debug(
-                        f"Obtained mutex to generate libpsec: {libspec_filename}."
-                    )
-                    call.append(libspec_filename)
-
-                    mtime: float = -1
-                    try:
-                        mtime = os.path.getmtime(libspec_filename)
-                    except:
-                        pass
-
-                    log.debug(
-                        "Generating libspec for: %s.\nCwd:%s\nCommand line:\n%s",
-                        libname,
-                        cwd,
-                        " ".join(call),
-                    )
-                    try:
-                        try:
-                            # Note: stdout is always subprocess.PIPE in this call.
-                            # Note: the env is alway inherited (the process which has
-                            # the LibspecManager must be the target env already).
-                            self._subprocess_check_output(
-                                call,
-                                stderr=subprocess.STDOUT,
-                                stdin=subprocess.PIPE,
-                                cwd=cwd,
-                            )
-                        except OSError as e:
-                            log.exception("Error calling: %s", call)
-                            # We may have something as: Ignore OSError: [WinError 6] The handle is invalid,
-                            # give the result based on whether the file changed on disk.
-                            try:
-                                if mtime != os.path.getmtime(libspec_filename):
-                                    _dump_spec_filename_additional_info(
-                                        libspec_filename,
-                                        is_builtin=is_builtin,
-                                        obtain_mutex=False,
-                                    )
-                                    return True
-                            except:
-                                pass
-
-                            log.debug("Not retrying after OSError failure.")
-                            return False
-
-                    except subprocess.CalledProcessError as e:
-                        if not _internal_force_text:
-                            if (
-                                b"reST format requires 'docutils' module to be installed"
-                                in e.output
-                            ):
-                                return self._cached_create_libspec(
-                                    libname,
-                                    is_builtin,
-                                    target_file,
-                                    _internal_force_text=True,
-                                )
-
-                        log.exception(
-                            "Error creating libspec: %s.\nReturn code: %s\nOutput:\n%s",
-                            libname,
-                            e.returncode,
-                            e.output,
-                        )
-                        return False
-                    _dump_spec_filename_additional_info(
-                        libspec_filename, is_builtin=is_builtin, obtain_mutex=False
-                    )
->>>>>>> upstream/master
                     return True
             except Exception as e:
                 log.exception("Error creating libspec: %s\n%s", libname, e)
@@ -1101,7 +960,7 @@ class LibspecManager(ILibspecManager):
         self._observer.dispose()
         self._file_changes_notifier.dispose()
 
-    def _do_create_libspec_on_get(self, libname, current_doc_uri, arguments, alias, target_file: Optional[str]):
+    def _do_create_libspec_on_get(self, libname, current_doc_uri, arguments, alias):
         from robocorp_ls_core import uris
 
         additional_path = None
@@ -1131,31 +990,6 @@ class LibspecManager(ILibspecManager):
             return True
         return False
 
-    def get_library_target_filename(
-        self, libname: str, current_doc_uri: Optional[str] = None
-    ) -> Optional[str]:
-        from robocorp_ls_core import uris
-
-        target_file: Optional[str] = None
-        libname_lower = libname.lower()
-
-        if os.path.isabs(libname):
-            target_file = libname
-        else:
-            # Check if it maps to a file in the filesystem
-            if current_doc_uri is not None:
-                cwd = os.path.dirname(uris.to_fs_path(current_doc_uri))
-                if cwd and os.path.isdir(cwd):
-                    f = os.path.join(cwd, libname)
-                    if os.path.exists(f):
-                        target_file = f
-
-                    elif not libname_lower.endswith(".py"):
-                        f += ".py"
-                        if os.path.exists(f):
-                            target_file = f
-        return target_file
-
     def get_library_info(self, libname, create=True, current_doc_uri=None, arguments=(), alias=None) -> Optional[LibraryDoc]:
         """
         :param libname:
@@ -1169,61 +1003,22 @@ class LibspecManager(ILibspecManager):
             return None
 
         libname_lower = libname.lower()
-        target_file = self.get_library_target_filename(libname, current_doc_uri)
+        if libname_lower.endswith((".py", ".class", ".java")):
+            libname_lower = os.path.splitext(libname_lower)[0]
 
-        if target_file:
-            normalized_target_file = os.path.normcase(os.path.normpath(target_file))
-        else:
-            normalized_target_file = ""
+        if "/" in libname_lower or "\\" in libname_lower:
+            libname_lower = os.path.basename(libname_lower)
 
-        lib_info: _LibInfo
-        for lib_info in self.iter_lib_info():
+        for lib_info in self._iter_lib_info():
             library_doc = lib_info.library_doc
-<<<<<<< HEAD
             if library_doc.name and library_doc.name.lower() == libname_lower and lib_info.arguments == arguments or ():
                 if not lib_info.verify_sources_sync(arguments, alias):
-=======
-
-            # If it maps to a file in the filesystem, that's what we need to match,
-            # otherwise, match just by its name.
-            # Note: this is only valid for the cases where we can regenerate the info
-            # for cases where this information is builtin, only match by the name.
-            if target_file and lib_info._can_regenerate:
-                found = (
-                    library_doc.source
-                    and os.path.normcase(os.path.normpath(library_doc.source))
-                    == normalized_target_file
-                )
-                if not found:
-                    try:
-                        found = library_doc.source and os.path.samefile(
-                            library_doc.source, target_file
-                        )
-                    except:
-                        # os.path.samefile touches the filesystem, so, it can
-                        # raise an exception.
-                        found = False
-            else:
-                if libname_lower.endswith((".py", ".class", ".java")):
-                    libname_lower = os.path.splitext(libname_lower)[0]
-
-                if "/" in libname_lower or "\\" in libname_lower:
-                    libname_lower = os.path.basename(libname_lower)
-                found = library_doc.name and library_doc.name.lower() == libname_lower
-
-            if found:
-                if not lib_info.verify_sources_sync():
->>>>>>> upstream/master
                     if create:
                         # Found but it's not in sync. Try to regenerate (don't proceed
                         # because we don't want to match a lower priority item, so,
                         # regenerate and get from the cache without creating).
-<<<<<<< HEAD
                         self._do_create_libspec_on_get(
                             libname, current_doc_uri, arguments, alias)
-=======
-                        self._do_create_libspec_on_get(libname, target_file)
->>>>>>> upstream/master
 
                         # Note: get even if it if was not created (we may match
                         # a lower priority library).
@@ -1238,11 +1033,7 @@ class LibspecManager(ILibspecManager):
                     return library_doc
 
         if create:
-<<<<<<< HEAD
             if self._do_create_libspec_on_get(libname, current_doc_uri, arguments, alias):
-=======
-            if self._do_create_libspec_on_get(libname, target_file):
->>>>>>> upstream/master
                 return self.get_library_info(
                     libname, create=False, current_doc_uri=current_doc_uri,
                     arguments=arguments, alias=alias
@@ -1253,3 +1044,6 @@ class LibspecManager(ILibspecManager):
 
     def get_library_error(self, libname, current_doc_uri=None, arguments=(), alias=None):
         return self.libspec_errors.get(LibspecErrorEntry(libname, arguments, alias, current_doc_uri), None)
+
+    def get_library_warning(self, libname, current_doc_uri=None, arguments=(), alias=None):
+        return self.libspec_warnings.get(LibspecErrorEntry(libname, arguments, alias, current_doc_uri), None)

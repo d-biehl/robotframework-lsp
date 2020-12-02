@@ -46,6 +46,9 @@ class ILibspecManager(Protocol):
     def get_library_error(self, libname,  current_doc_uri=None, arguments=None, alias=None):
         ...
 
+    def get_library_warning(self, libname,  current_doc_uri=None, arguments=None, alias=None):
+        ...
+
     def add_workspace_folder(self, folder_uri: str):
         ...
 

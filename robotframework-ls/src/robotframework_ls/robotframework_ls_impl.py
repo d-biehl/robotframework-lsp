@@ -90,6 +90,8 @@ def run_in_new_thread(func, thread_name):
 
 class _LintManager(object):
     def __init__(self, server_manager, lsp_messages) -> None:
+        from concurrent.futures import ThreadPoolExecutor, Future
+
         from robotframework_ls.server_manager import ServerManager
 
         self._server_manager: ServerManager = server_manager
@@ -97,10 +99,19 @@ class _LintManager(object):
 
         self._next_id = partial(next, itertools.count())
         self._doc_id_to_info: Dict[str, _CurrLintInfo] = {}
+        self._doc_id_to_future: Dict[str, Future] = {}
+
+        self.thread_executor = ThreadPoolExecutor(thread_name_prefix="linting")
+
+    def __del__(self):
+        self.thread_executor.shutdown(False, cancel_futures=True)
 
     def schedule_lint(self, doc_uri: str, is_saved: bool) -> None:
+        log.info(f"schedule linting for {doc_uri}")
+
         self.cancel_lint(doc_uri)
-        rf_lint_api_client = self._server_manager.get_lint_rf_api_client(doc_uri)
+        rf_lint_api_client = self._server_manager.get_lint_rf_api_client(
+            doc_uri)
         if rf_lint_api_client is None:
             log.info(f"Unable to get lint api for: {doc_uri}")
             return
@@ -108,20 +119,24 @@ class _LintManager(object):
         curr_info = _CurrLintInfo(
             rf_lint_api_client, self._lsp_messages, doc_uri, is_saved
         )
-        
-        self._doc_id_to_info[doc_uri] = curr_info
-        
-        from robocorp_ls_core.timeouts import TimeoutTracker
 
-        timeout_tracker = TimeoutTracker.get_singleton()
-        timeout_tracker.call_on_timeout(
-            LINT_DEBOUNCE_S, partial(run_in_new_thread, curr_info, f"Lint: {doc_uri}")
-        )
+        self._doc_id_to_info[doc_uri] = curr_info
+
+        def run():            
+            time.sleep(LINT_DEBOUNCE_S)
+            curr_info()
+
+        self._doc_id_to_future[doc_uri] = self.thread_executor.submit(run)        
+        self._doc_id_to_future[doc_uri].add_done_callback(
+            lambda x: log.info(f"linting for {doc_uri} done"))
 
     def cancel_lint(self, doc_uri: str) -> None:
         curr_info = self._doc_id_to_info.pop(doc_uri, None)
         if curr_info is not None:
             curr_info.cancel()
+        curr_future = self._doc_id_to_future.pop(doc_uri, None)
+        if curr_future is not None:
+            curr_future.cancel()
 
 
 class RobotFrameworkLanguageServer(PythonLanguageServer):
@@ -155,7 +170,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
             EPEndPointProvider, DefaultEndPointProvider(self._endpoint)
         )
         self._server_manager = ServerManager(self._pm, language_server=self)
-        self._lint_manager = _LintManager(self._server_manager, self._lsp_messages)
+        self._lint_manager = _LintManager(
+            self._server_manager, self._lsp_messages)
 
     @overrides(PythonLanguageServer._create_config)
     def _create_config(self) -> IConfig:
@@ -171,7 +187,7 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     @overrides(PythonLanguageServer._create_workspace)
     def _create_workspace(self, root_uri, workspace_folders):
         from robotframework_ls.impl.robot_workspace import RobotWorkspace
-        
+
         return RobotWorkspace(root_uri, workspace_folders, generate_ast=False)
 
     def m_initialize(
@@ -296,7 +312,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     def m_workspace__execute_command(self, command=None, arguments=()) -> Any:
         if command == "robot.addPluginsDir":
             directory: str = arguments[0]
-            assert os.path.isdir(directory), f"Expected: {directory} to be a directory."
+            assert os.path.isdir(
+                directory), f"Expected: {directory} to be a directory."
             self._pm.load_plugins_from(Path(directory))
             return True
 
@@ -321,12 +338,14 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
                             "additionalPythonpathEntries": interpreter_info.get_additional_pythonpath_entries(),
                         }
             except:
-                log.exception(f"Error resolving interpreter. Args: {arguments}")
+                log.exception(
+                    f"Error resolving interpreter. Args: {arguments}")
 
     @overrides(PythonLanguageServer.m_workspace__did_change_configuration)
     @log_and_silence_errors(log)
     def m_workspace__did_change_configuration(self, **kwargs):
-        PythonLanguageServer.m_workspace__did_change_configuration(self, **kwargs)
+        PythonLanguageServer.m_workspace__did_change_configuration(
+            self, **kwargs)
         self._server_manager.set_config(self.config)
 
     # --- Methods to forward to the api
@@ -348,7 +367,7 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     def m_text_document__document_highlight(
         self, *args,  **kwargs
     ) -> Optional[list]:
-        return []    
+        return []
 
     def m_text_document__formatting(
         self, textDocument=None, options=None
@@ -374,7 +393,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         # can't get it.
         available_time = maxtime - time.time()
         if available_time <= 0:
-            raise RuntimeError("Code formatting timed-out (available_time <= 0).")
+            raise RuntimeError(
+                "Code formatting timed-out (available_time <= 0).")
 
         if message_matcher.event.wait(available_time):
             msg = message_matcher.msg
@@ -389,7 +409,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     @overrides(PythonLanguageServer.m_text_document__did_close)
     def m_text_document__did_close(self, textDocument=None, **_kwargs):
         self._server_manager.forward(
-            ("api", "lint"), "textDocument/didClose", {"textDocument": textDocument}
+            ("api",
+             "lint"), "textDocument/didClose", {"textDocument": textDocument}
         )
         PythonLanguageServer.m_text_document__did_close(
             self, textDocument=textDocument, **_kwargs
@@ -398,7 +419,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     @overrides(PythonLanguageServer.m_text_document__did_open)
     def m_text_document__did_open(self, textDocument=None, **_kwargs):
         self._server_manager.forward(
-            ("api", "lint"), "textDocument/didOpen", {"textDocument": textDocument}
+            ("api",
+             "lint"), "textDocument/didOpen", {"textDocument": textDocument}
         )
         PythonLanguageServer.m_text_document__did_open(
             self, textDocument=textDocument, **_kwargs
@@ -472,7 +494,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         document = workspace.get_document(doc_uri, accept_from_file=True)
         if document is None:
-            error_msg = "Unable to find document (%s) for definition." % (doc_uri,)
+            error_msg = "Unable to find document (%s) for definition." % (
+                doc_uri,)
             log.critical(error_msg)
             raise RuntimeError(error_msg)
 
@@ -532,7 +555,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         document = ws.get_document(doc_uri, accept_from_file=True)
         if document is None:
-            log.critical("Unable to find document (%s) for completions." % (doc_uri,))
+            log.critical(
+                "Unable to find document (%s) for completions." % (doc_uri,))
             return []
 
         ctx = CompletionContext(document, line, col, config=self.config)
@@ -540,7 +564,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         # Asynchronous completion.
         message_matchers: List[Optional[IIdMessageMatcher]] = []
-        message_matchers.append(rf_api_client.request_complete_all(doc_uri, line, col))
+        message_matchers.append(
+            rf_api_client.request_complete_all(doc_uri, line, col))
 
         # These run locally (no need to get from the server).
         completions.extend(section_completions.complete(ctx))
@@ -581,13 +606,13 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         rf_api_client = self._server_manager.get_regular_rf_api_client(doc_uri)
         if rf_api_client is not None:
-            func = partial(self._signature_help, rf_api_client, doc_uri, line, col)
+            func = partial(self._signature_help,
+                           rf_api_client, doc_uri, line, col)
             func = require_monitor(func)
             return func
 
         log.info("Unable to get signature (no api available).")
         return []
-
 
     @log_and_silence_errors(log)
     def _signature_help(
@@ -602,12 +627,14 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         ws = self.workspace
         if not ws:
-            log.critical("Workspace must be set before getting signature help.")
+            log.critical(
+                "Workspace must be set before getting signature help.")
             return None
 
         document = ws.get_document(doc_uri, accept_from_file=True)
         if document is None:
-            log.critical("Unable to find document (%s) for completions." % (doc_uri,))
+            log.critical(
+                "Unable to find document (%s) for completions." % (doc_uri,))
             return None
 
         # Asynchronous completion.
@@ -672,7 +699,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         document = ws.get_document(doc_uri, accept_from_file=True)
         if document is None:
-            log.critical("Unable to find document (%s) for hover." % (doc_uri,))
+            log.critical("Unable to find document (%s) for hover." %
+                         (doc_uri,))
             return None
 
         # Asynchronous completion.
@@ -698,8 +726,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         return None
 
     def m_text_document__folding_range(
-            self, *args,  **kwargs
-        ) -> Optional[list]:
+        self, *args,  **kwargs
+    ) -> Optional[list]:
         """
         "params": {
             "textDocument": {
@@ -708,7 +736,7 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         },
         """
 
-        doc_uri = kwargs["textDocument"]["uri"]       
+        doc_uri = kwargs["textDocument"]["uri"]
 
         rf_api_client = self._server_manager.get_regular_rf_api_client(doc_uri)
         if rf_api_client is not None:
@@ -723,11 +751,11 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     def _folding_range(
         self,
         rf_api_client: IRobotFrameworkApiClient,
-        doc_uri: str,       
+        doc_uri: str,
         monitor: Monitor,
     ) -> Optional[dict]:
         from robocorp_ls_core.client_base import wait_for_message_matcher
-     
+
         ws = self.workspace
         if not ws:
             log.critical("Workspace must be set before getting hover.")
@@ -735,7 +763,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         document = ws.get_document(doc_uri, accept_from_file=True)
         if document is None:
-            log.critical("Unable to find document (%s) for folding range." % (doc_uri,))
+            log.critical(
+                "Unable to find document (%s) for folding range." % (doc_uri,))
             return None
 
         # Asynchronous completion.
@@ -761,8 +790,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         return None
 
     def m_text_document__code_lens(
-            self, *args,  **kwargs
-        ) -> Optional[list]:
+        self, *args,  **kwargs
+    ) -> Optional[list]:
         """
         "params": {
             "textDocument": {
@@ -771,7 +800,7 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
         },
         """
 
-        doc_uri = kwargs["textDocument"]["uri"]       
+        doc_uri = kwargs["textDocument"]["uri"]
 
         rf_api_client = self._server_manager.get_regular_rf_api_client(doc_uri)
         if rf_api_client is not None:
@@ -786,11 +815,11 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
     def _code_lens(
         self,
         rf_api_client: IRobotFrameworkApiClient,
-        doc_uri: str,       
+        doc_uri: str,
         monitor: Monitor,
     ) -> Optional[dict]:
         from robocorp_ls_core.client_base import wait_for_message_matcher
-     
+
         ws = self.workspace
         if not ws:
             log.critical("Workspace must be set before getting hover.")
@@ -798,7 +827,8 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
 
         document = ws.get_document(doc_uri, accept_from_file=True)
         if document is None:
-            log.critical("Unable to find document (%s) for code lens." % (doc_uri,))
+            log.critical(
+                "Unable to find document (%s) for code lens." % (doc_uri,))
             return None
 
         # Asynchronous completion.
@@ -822,5 +852,3 @@ class RobotFrameworkLanguageServer(PythonLanguageServer):
                     return result
 
         return None
-
-        

@@ -3,7 +3,7 @@ import os
 from typing import Dict, List, Optional, Tuple, Any
 
 
-def run_doc(library_name: str, output_filename: str, additional_path: str, additional_pythonpath_entries: List[str], variables: Dict[str, str], strip_traceback=True) -> Tuple[Any, Optional[str]]:
+def run_doc(library_name: str, output_filename: str, additional_path: str, additional_pythonpath_entries: List[str], variables: Dict[str, str], strip_traceback=True) -> Tuple[Any, Optional[str], Optional[str]]:
 
     from robot.variables import Variables
     from robot.errors import DataError
@@ -86,7 +86,9 @@ def run_doc(library_name: str, output_filename: str, additional_path: str, addit
             libdoc.keywords = KeywordDocBuilder().build_keywords(lib)
             return libdoc
 
+    warning = None
     old_path = sys.path
+    libdoc = None
     try:
         if additional_pythonpath_entries:
             for p in additional_pythonpath_entries:
@@ -100,15 +102,26 @@ def run_doc(library_name: str, output_filename: str, additional_path: str, addit
             vars[n] = v
 
         libdoc = _LibraryDocumentation(library_name, variables=vars)
+        docutils_installed = True
+        if libdoc.doc_format == "REST":
+            try:
+                import docutils
+            except:
+                docutils_installed = False
+
+        if docutils_installed:
+            libdoc.convert_docs_to_html()
+        else:
+            warning = "reST format requires 'docutils' module to be installed."
 
         libdoc.save(output_filename,
                     "XML:HTML" if get_robot_major_version() < 4 else "LIBSPEC")
 
-        return (libdoc, None)
+        return (libdoc, None, warning)
     except BaseException as e:
         msg: str = get_error_message()
         if strip_traceback:
             msg = msg[:msg.find("Traceback")].strip()
-        return None, msg
+        return None, msg, warning
     finally:
         sys.path = old_path

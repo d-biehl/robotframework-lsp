@@ -80,14 +80,6 @@ class _CurrLintInfo(object):
         self._monitor.cancel()
 
 
-def run_in_new_thread(func, thread_name):
-    import threading
-
-    t = threading.Thread(target=func)
-    t.name = thread_name
-    t.start()
-
-
 class _LintManager(object):
     def __init__(self, server_manager, lsp_messages) -> None:
         from concurrent.futures import ThreadPoolExecutor, Future
@@ -122,11 +114,11 @@ class _LintManager(object):
 
         self._doc_id_to_info[doc_uri] = curr_info
 
-        def run():            
+        def run():
             time.sleep(LINT_DEBOUNCE_S)
             curr_info()
 
-        self._doc_id_to_future[doc_uri] = self.thread_executor.submit(run)        
+        self._doc_id_to_future[doc_uri] = self.thread_executor.submit(run)
         self._doc_id_to_future[doc_uri].add_done_callback(
             lambda x: log.info(f"linting for {doc_uri} done"))
 

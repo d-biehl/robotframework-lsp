@@ -1,4 +1,4 @@
-from os.path import os
+import os
 import json
 import socket as socket_module
 import sys

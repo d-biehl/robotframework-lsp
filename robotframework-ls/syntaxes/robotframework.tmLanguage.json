@@ -408,26 +408,29 @@
             "name": "meta.variables.robot"
         },
         "run_keyword_if": {
-            "end": "(?:  | ?\\t| ?$)",
-            "begin": "(?i)^(?:\\s)+((?:Run Keyword If)|(?:Run Keyword Unless))(?:(?: {2,})|(?: ?\\t))+(.*?)?(?:  | ?\\t| ?$)+(.*?)?(?:  | ?\\t| ?$)+",
+            "end": "^(?!\\s*\\.\\.\\.)",
+            "begin": "^(?i)(?:\\s)+(run keyword ((if)|(unless))+)",
             "beginCaptures": {
                 "1": {
                     "name": "keyword.control.robot"
-                },
-                "2": {
-                    "name": "string.interpolated.robot"
-                },
-                "3": {
-                    "name": "meta.support.function.robot"
                 }
             },
             "contentName": "string.quoted.single.robot",
             "patterns": [
-                {
+                {                    
                     "include": "#escape"
                 },
                 {
                     "include": "#comment"
+                },
+                {
+                    "match": "(ELSE( IF)?)",
+                    "name": "meta.runkeywordif.else.robot",
+                    "captures": {
+                        "1": {
+                            "name": "keyword.control.robot"
+                        }
+                    }
                 },
                 {
                     "include": "#variables"
@@ -518,7 +521,7 @@
                 }
             ],
             "name": "meta.if.robot"
-        },  
+        },
         "ELSE": {
             "end": "^(?!\\s*\\.\\.\\.)",
             "begin": "^(?i)(?:\\s)+(ELSE)",
@@ -534,13 +537,13 @@
                 },
                 {
                     "include": "#comment"
-                },                
+                },
                 {
                     "include": "#line_continuation"
                 }
             ],
             "name": "meta.else.robot"
-        },              
+        },
         "ELSE_IF": {
             "end": "^(?!\\s*\\.\\.\\.)",
             "begin": "^(?i)(?:\\s)+(ELSE IF)",
@@ -587,18 +590,18 @@
                 }
             ],
             "name": "meta.end.robot"
-        },       
+        },
         "control_keywords": {
             "patterns": [
                 {
                     "include": "#run_keyword_if"
-                },                
+                },
                 {
                     "include": "#ELSE_IF"
                 },
                 {
                     "include": "#ELSE"
-                },             
+                },
                 {
                     "include": "#IF"
                 },

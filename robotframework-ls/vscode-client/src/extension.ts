@@ -23,10 +23,11 @@ import * as net from 'net';
 import * as path from 'path';
 import * as fs from 'fs';
 
-import { workspace, Disposable, ExtensionContext, window, commands, ConfigurationTarget, debug, DebugAdapterExecutable, ProviderResult, DebugConfiguration, WorkspaceFolder, CancellationToken, DebugConfigurationProvider } from 'vscode';
+import { workspace, Disposable, ExtensionContext, window, commands, ConfigurationTarget, debug, DebugAdapterExecutable, ProviderResult, DebugConfiguration, WorkspaceFolder, CancellationToken, DebugConfigurationProvider, DebugSession, DebugSessionOptions } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient';
 import { ProgressReport, handleProgressMessage } from './progress';
 import { Timing } from './time';
+
 
 import * as vscode from 'vscode';
 
@@ -105,6 +106,7 @@ class RobotDebugConfigurationProvider implements DebugConfigurationProvider {
 		let args: Array<string> = debugConfiguration.args;
 		let config = workspace.getConfiguration("robot");
 		let pythonpath: Array<string> = config.get<Array<string>>("pythonpath");
+		
 		let variables: object = config.get("variables");
 		let targetRobot: object = debugConfiguration.target;
 
@@ -282,20 +284,52 @@ async function getDefaultLanguageServerPythonExecutable(): Promise<ExecutableAnd
 	}
 }
 
-function runTestcase(file: String, testcase: String) {
-	window.showInformationMessage(`run test case ${file} ${testcase}`)
+function debugSuiteOrTestcase(document_uri: string, testcase?: string, options?: DebugSessionOptions) {
+	return new Promise((res, rej) => {
+		let config = workspace.getConfiguration("robot");
+		let pythonenv: object = config.get("python.env");
+
+		let uri = vscode.Uri.parse(document_uri);
+
+		let folder = workspace.getWorkspaceFolder(uri);
+
+		var args = [
+			
+		]
+
+		if (testcase) {
+			args.push("-t")
+			args.push(testcase)
+		}
+
+		debug.startDebugging(folder, {
+			type: "robotframework-lsp",
+			name: `Robotframework: Suite: ${document_uri}${testcase ? " Testcase: " + testcase: ""}`,
+			request: "launch",
+			cwd: folder.uri.fsPath,
+			target: uri.fsPath,
+			terminal: "none",
+			env: pythonenv,
+			args: args
+		}, options).then(res, rej);
+
+	});
 }
 
-function debugTestcase(file: String, testcase: String) {
-	window.showInformationMessage(`debug test case ${file} ${testcase}`)
+function runTestcase(document_uri: string, testcase: string) {
+	return debugSuiteOrTestcase(document_uri, testcase)
 }
 
-function runTestsuite(file: String) {
-	window.showInformationMessage(`run test suite ${file}`)
+function debugTestcase(document_uri: string, testcase: string) {
+	return debugSuiteOrTestcase(document_uri, testcase)
 }
 
-function debugTestsuite(file: String) {
-	window.showInformationMessage(`debug test suite ${file}`)
+function runTestsuite(document_uri: string) {
+	return debugSuiteOrTestcase(document_uri, null, {noDebug: true})
+}
+
+function debugTestsuite(document_uri: string) {
+	return debugSuiteOrTestcase(document_uri)
 }
 
 

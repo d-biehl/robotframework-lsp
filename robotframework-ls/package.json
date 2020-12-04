@@ -32,7 +32,11 @@
         "onLanguage:robotframework",
         "onDebugInitialConfigurations",
         "onDebugResolve:robotframework-lsp",
-        "onCommand:robot.resolveInterpreter"
+        "onCommand:robot.resolveInterpreter",
+        "onCommand:robot.runTestcase",
+        "onCommand:robot.debugTestcase",
+        "onCommand:robot.runTestsuite",
+        "onCommand:robot.debugTestsuite"
     ],
     "galleryBanner": {
         "theme": "dark",
@@ -116,6 +120,36 @@
                 "path": "./syntaxes/robotframework.tmLanguage.json"
             }
         ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "robot.runTestsuite",
+                    "title": "Run Testsuite",
+                    "group": "1_run@1",
+                    "when": "resourceLangId == robotframework && resourceExtname == .robot && !isInDiffEditor"
+                },
+                {
+                    "command": "robot.debugTestsuite",
+                    "title": "Debug Testsuite",
+                    "group": "1_run@2",
+                    "when": "resourceLangId == robotframework && resourceExtname == .robot && !isInDiffEditor"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "robot.runTestsuite",
+                    "title": "Run Testsuite",
+                    "group": "robot@1",
+                    "when": "resourceLangId == robotframework && resourceExtname == .robot || explorerResourceIsFolder"
+                },
+                {
+                    "command": "robot.debugTestsuite",
+                    "title": "Debug Testsuite",
+                    "group": "robot@2",
+                    "when": "resourceLangId == robotframework && resourceExtname == .robot || explorerResourceIsFolder"
+                }
+            ]
+        },
         "keybindings": [
             {
                 "key": "tab",
@@ -130,24 +164,40 @@
             {
                 "command": "robot.runTestcase",
                 "title": "Run Testcase",
-                "category": "Robot"
+                "category": "Robot",
+                "icon": {
+                    "light": "resources/light/start.svg",
+                    "dark": "resources/dark/start.svg"
+                }
             },
             {
                 "command": "robot.debugTestcase",
                 "title": "Debug Testcase",
-                "category": "Robot"
+                "category": "Robot",
+                "icon": {
+                    "light": "resources/light/debug.svg",
+                    "dark": "resources/dark/debug.svg"
+                }
             },
             {
                 "command": "robot.runTestsuite",
                 "title": "Run Testsuite",
-                "category": "Robot"
+                "category": "Robot",
+                "icon": {
+                    "light": "resources/light/run-tests.svg",
+                    "dark": "resources/dark/run-tests.svg"
+                }
             },
             {
                 "command": "robot.debugTestsuite",
                 "title": "Debug Testsuite",
-                "category": "Robot"
+                "category": "Robot",
+                "icon": {
+                    "light": "resources/light/debug.svg",
+                    "dark": "resources/dark/debug.svg"
+                }
             }
-        ],
+        ],  
         "breakpoints": [
             {
                 "language": "robotframework"

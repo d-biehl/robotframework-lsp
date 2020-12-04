@@ -60,7 +60,7 @@ r"""
 
 
 import json
-import os.path
+import os
 import sys
 import itertools
 import ntpath

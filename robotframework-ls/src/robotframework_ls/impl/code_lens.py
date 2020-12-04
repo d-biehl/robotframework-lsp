@@ -23,20 +23,23 @@ class CodeLensVisitor(CompletionContextModelVisitor):
 
     def visit_TestCase(self, node: TestCase):
         self.code_lens.append(CodeLens(Range(Position(node.header.lineno - 1, node.header.col_offset),
-                                             Position(node.header.lineno - 1, node.header.col_offset)), Command("Run", "robot.runTestcase", [self.doc_uri, node.name])))
+                                             Position(node.header.lineno - 1, node.header.col_offset)), Command("Run Test", "robot.runTestcase", [self.doc_uri, node.name])))
         self.code_lens.append(CodeLens(Range(Position(node.header.lineno - 1, node.header.col_offset),
-                                             Position(node.header.lineno - 1, node.header.col_offset)), Command("Debug", "robot.debugTestcase", [self.doc_uri, node.name])))
+                                             Position(node.header.lineno - 1, node.header.col_offset)), Command("Debug Test", "robot.debugTestcase", [self.doc_uri, node.name])))
 
     def visit_TestCaseSection(self, node: TestCaseSection):
-        self.code_lens.append(CodeLens(Range(Position(node.header.lineno - 1, node.header.col_offset),
-                                             Position(node.header.lineno - 1, node.header.col_offset)), Command("Run", "robot.runTestsuite", [self.doc_uri])))
-        self.code_lens.append(CodeLens(Range(Position(node.header.lineno - 1, node.header.col_offset),
-                                             Position(node.header.lineno - 1, node.header.col_offset)), Command("Debug", "robot.debugTestsuite", [self.doc_uri])))
         self.generic_visit(node)
 
 
 def code_lens(completion_context: ICompletionContext, doc_uri: str) -> Optional[List[Dict]]:
-    result = list([x.to_dict() for x in CodeLensVisitor.find_from(
-        completion_context.get_ast(), doc_uri, completion_context)])
+    result = []
 
-    return result
+    result.append(CodeLens(Range(Position(0, 0), Position(0, 0)),
+                           Command("Run Suite", "robot.runTestsuite", [doc_uri])))
+    result.append(CodeLens(Range(Position(0, 0), Position(0, 0)),
+                           Command("Debug Suite", "robot.debugTestsuite", [doc_uri])))
+
+    result += CodeLensVisitor.find_from(completion_context.get_ast(),
+                                        doc_uri, completion_context)
+
+    return list([x.to_dict() for x in result])

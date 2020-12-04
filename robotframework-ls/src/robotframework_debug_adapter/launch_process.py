@@ -21,7 +21,7 @@ from robotframework_debug_adapter.constants import DEBUG
 from robotframework_ls.options import DEFAULT_TIMEOUT
 import itertools
 import json
-import os.path
+import os
 import threading
 import queue
 
@@ -31,12 +31,12 @@ log = get_logger(__name__)
 class _DebugAdapterRobotTargetComm(threading.Thread):
     """
     This class is used so intermediate talking to the server.
-    
+
     It's the middle ground between the `DebugAdapterComm` and `RobotTargetComm`.
         - `DebugAdapterComm`:
             It's used to talk with the client (in this process) and accessed
             through the _weak_debug_adapter_comm attribute.
-             
+
         - `RobotTargetComm`
             It's actually in the target process. We communicate with it by 
             calling the `write_to_robot_message` method and receive messages
@@ -95,7 +95,8 @@ class _DebugAdapterRobotTargetComm(threading.Thread):
             debug_adapter_comm = self._weak_debug_adapter_comm()
             writer = self._writer_thread = threading.Thread(
                 target=writer_thread_no_auto_seq,
-                args=(write_to, self._write_to_robot_queue, "write to robot process"),
+                args=(write_to, self._write_to_robot_queue,
+                      "write to robot process"),
                 name="Write to robot (_DebugAdapterRobotTargetComm)",
             )
             writer.daemon = True
@@ -220,7 +221,8 @@ class _DebugAdapterRobotTargetComm(threading.Thread):
         return ret
 
     def wait_for_process_event(self):
-        log.debug("Wating for process event for %s seconds." % (DEFAULT_TIMEOUT,))
+        log.debug("Wating for process event for %s seconds." %
+                  (DEFAULT_TIMEOUT,))
         ret = self._process_event.wait(DEFAULT_TIMEOUT)
         log.debug("Received process event: %s" % (ret,))
         return ret
@@ -316,7 +318,8 @@ class LaunchProcess(object):
 
         target = request.arguments.kwargs.get("target")
         self._cwd = request.arguments.kwargs.get("cwd")
-        self._terminal = request.arguments.kwargs.get("terminal", TERMINAL_NONE)
+        self._terminal = request.arguments.kwargs.get(
+            "terminal", TERMINAL_NONE)
         args = request.arguments.kwargs.get("args") or []
         args = [str(arg) for arg in args]
 
@@ -338,7 +341,8 @@ class LaunchProcess(object):
             if "ROBOTFRAMEWORK" in key:
                 env[key] = value
 
-        env = dict(((as_str(key), as_str(value)) for (key, value) in env.items()))
+        env = dict(((as_str(key), as_str(value))
+                    for (key, value) in env.items()))
 
         self._env = env
 
@@ -454,7 +458,8 @@ class LaunchProcess(object):
                 debug_adapter_comm.write_to_client_message(response_msg)
             else:
                 log.debug(
-                    "Command processor collected in resend request: %s" % (request,)
+                    "Command processor collected in resend request: %s" % (
+                        request,)
                 )
 
         self._debug_adapter_robot_target_comm.write_to_robot_message(
@@ -462,19 +467,13 @@ class LaunchProcess(object):
         )
 
     def launch(self):
-        from robotframework_debug_adapter.constants import TERMINAL_NONE
-        from robotframework_debug_adapter.constants import TERMINAL_EXTERNAL
-        from robotframework_debug_adapter.constants import TERMINAL_INTEGRATED
+        from robotframework_debug_adapter.constants import TERMINAL_NONE, TERMINAL_EXTERNAL, TERMINAL_INTEGRATED, TERMINAL_TITLE
         from robocorp_ls_core.debug_adapter_core.dap.dap_schema import RunInTerminalRequest
-        from robocorp_ls_core.debug_adapter_core.dap.dap_schema import (
-            RunInTerminalRequestArguments,
-        )
+        from robocorp_ls_core.debug_adapter_core.dap.dap_schema import RunInTerminalRequestArguments
         from robocorp_ls_core.debug_adapter_core.dap.dap_schema import OutputEvent
         from robocorp_ls_core.debug_adapter_core.dap.dap_schema import OutputEventBody
         from robocorp_ls_core.debug_adapter_core.dap.dap_schema import InitializeRequest
-        from robocorp_ls_core.debug_adapter_core.dap.dap_schema import (
-            InitializeRequestArguments,
-        )
+        from robocorp_ls_core.debug_adapter_core.dap.dap_schema import InitializeRequestArguments
 
         # Note: using a weak-reference so that callbacks don't keep it alive
         weak_debug_adapter_comm = self._weak_debug_adapter_comm
@@ -531,7 +530,8 @@ class LaunchProcess(object):
             kind = terminal
 
             if DEBUG:
-                log.debug('Launching in "%s" terminal: %s' % (kind, self._cmdline))
+                log.debug('Launching in "%s" terminal: %s' %
+                          (kind, self._cmdline))
 
             debug_adapter_comm = weak_debug_adapter_comm()
             cmdline = self._cmdline
@@ -539,7 +539,7 @@ class LaunchProcess(object):
                 debug_adapter_comm.write_to_client_message(
                     RunInTerminalRequest(
                         RunInTerminalRequestArguments(
-                            cwd=self._cwd, args=cmdline, kind=kind, env=self._env
+                            cwd=self._cwd, args=cmdline, kind=kind, env=self._env, title=TERMINAL_TITLE
                         )
                     )
                 )
@@ -615,4 +615,5 @@ class LaunchProcess(object):
                 t.daemon = True
                 t.start()
             except:
-                log.exception("Error writing: >>%s<< to stdin." % (expression,))
+                log.exception("Error writing: >>%s<< to stdin." %
+                              (expression,))

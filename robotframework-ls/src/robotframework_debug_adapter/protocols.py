@@ -4,7 +4,7 @@ from typing import TypeVar, List, Union, Any, Optional, Iterable
 from robocorp_ls_core.debug_adapter_core.dap.dap_schema import StackFrame
 from robocorp_ls_core.protocols import IFuture
 
-if sys.version_info[:2] < (3, 8):
+if sys.version_info < (3, 8):
 
     class Protocol(object):
         pass

@@ -96,6 +96,16 @@
                     "type": "array",
                     "default": [],
                     "description": "Specifies the entries to be added to the PYTHONPATH (used when resolving resources and imports and automatically passed to the launch config as --pythonpath entries). i.e.: [\"</my/path_entry>\"]"
+                },
+                "robot.debug.terminal": {
+                    "type": "string",
+                    "default": "none",
+                    "description": "Specifies the debug terminal to use in debugging.",
+                    "enum": [
+                        "none",
+                        "integrated",
+                        "external"
+                    ]
                 }
             }
         },

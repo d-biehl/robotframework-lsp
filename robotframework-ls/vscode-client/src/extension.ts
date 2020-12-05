@@ -105,7 +105,7 @@ class RobotDebugConfigurationProvider implements DebugConfigurationProvider {
 		// When we resolve a configuration we add the pythonpath and variables to the command line.
 		let args: Array<string> = debugConfiguration.args;
 		let config = workspace.getConfiguration("robot");
-		let pythonpath: Array<string> = config.get<Array<string>>("pythonpath");
+		let pythonpath: Array<string> = config.get<Array<string>>("pythonpath");		
 
 		let variables: object = config.get("variables");
 		let targetRobot: object = debugConfiguration.target;
@@ -126,6 +126,15 @@ class RobotDebugConfigurationProvider implements DebugConfigurationProvider {
 			}
 		}
 
+		let pythonenv: object = config.get("python.env");		
+		for (let p in pythonenv) {
+			if (!debugConfiguration.env)
+				debugConfiguration.env = {}
+			if (!(p in debugConfiguration.env)) {
+				debugConfiguration.env[p] = pythonenv[p]
+			}
+		}
+		
 		let newArgs = [];
 		pythonpath.forEach(element => {
 			newArgs.push('--pythonpath');
@@ -144,6 +153,11 @@ class RobotDebugConfigurationProvider implements DebugConfigurationProvider {
 			args = newArgs;
 		}
 		debugConfiguration.args = args;
+
+		if (!debugConfiguration.terminal) {			
+			debugConfiguration.terminal = config.get<string>("debug.terminal");
+		}		
+		
 		return debugConfiguration;
 	};
 }
@@ -286,13 +300,10 @@ async function getDefaultLanguageServerPythonExecutable(): Promise<ExecutableAnd
 
 function debugSuiteOrTestcase(document_uri: string | vscode.Uri, testcase?: string, options?: DebugSessionOptions) {
 	return new Promise((res, rej) => {
-		let config = workspace.getConfiguration("robot");
-		let pythonenv: object = config.get("python.env");
-
 		let uri = document_uri instanceof vscode.Uri ? document_uri : vscode.Uri.parse(document_uri);
 
 		let folder = workspace.getWorkspaceFolder(uri);
-				
+
 		var args = [
 
 		]
@@ -302,14 +313,12 @@ function debugSuiteOrTestcase(document_uri: string | vscode.Uri, testcase?: stri
 			args.push(testcase)
 		}
 
-		debug.startDebugging(folder, {			
+		debug.startDebugging(folder, {
 			type: "robotframework-lsp",
 			name: `Robot: Suite: ${document_uri}${testcase ? " Testcase: " + testcase : ""}`,
 			request: "launch",
 			cwd: folder.uri.fsPath,
-			target: uri.fsPath,
-			terminal:  "none",	// TODO possibility to get from workspace configurations
-			env: pythonenv,
+			target: uri.fsPath,		
 			args: args
 		}, options).then(res, rej);
 
@@ -433,7 +442,7 @@ export async function activate(context: ExtensionContext) {
 		vscode.commands.registerCommand("robot.debugTestcase", debugTestcase)
 		vscode.commands.registerCommand("robot.runTestsuite", runTestsuite)
 		vscode.commands.registerCommand("robot.debugTestsuite", debugTestsuite)
-		
+
 	} finally {
 		workspace.onDidChangeConfiguration(event => {
 			for (let s of ["robot.language-server.python", "robot.language-server.tcp-port", "robot.language-server.args"]) {

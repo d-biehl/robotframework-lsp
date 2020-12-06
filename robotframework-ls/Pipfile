@@ -14,8 +14,9 @@ mock = "*"
 pytest-regressions = "*"
 pytest-xdist = "*"
 psutil = "*"
+debugpy = "*"
 
 [packages]
-watchdog = {editable = true, path = "./../robocorp-python-ls-core/src"}
-robotframework-lsp = {editable = true, path = "./src"}
-robotframework = {git = "https://github.com/robotframework/robotframework.git"}
+watchdog = { editable = true, path = "./../robocorp-python-ls-core/src" }
+robotframework-lsp = { editable = true, path = "./src" }
+robotframework = { git = "https://github.com/robotframework/robotframework.git" }

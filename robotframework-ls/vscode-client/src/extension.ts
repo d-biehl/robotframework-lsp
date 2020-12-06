@@ -320,7 +320,18 @@ function debugSuiteOrTestcase(document_uri: string | vscode.Uri, testcase?: stri
 			cwd: folder.uri.fsPath,
 			target: uri.fsPath,		
 			args: args
-		}, options).then(res, rej);
+		}, options).then(options?.noDebug ? res : v => {
+			debug.startDebugging(folder, {
+				type: "python",
+				name: `Python Robot: Suite: ${document_uri}${testcase ? " Testcase: " + testcase : ""}`,
+				request: "attach",
+				justMyCode: false,
+				connect: {
+					host: "localhost",
+					port: 5678
+				},
+			}, options).then(res, rej)
+		}, rej);
 
 	});
 }

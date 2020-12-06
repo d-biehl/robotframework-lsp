@@ -46,11 +46,13 @@ def connect(port):
 
     try:
         # 10 seconds default timeout
-        timeout = int(os.environ.get(ENV_OPTION_ROBOT_DAP_TIMEOUT, DEFAULT_TIMEOUT))
+        timeout = int(os.environ.get(
+            ENV_OPTION_ROBOT_DAP_TIMEOUT, DEFAULT_TIMEOUT))
         s.settimeout(timeout)
         s.connect(("127.0.0.1", port))
         s.settimeout(None)  # no timeout after connected
         log.info("Connected.")
+
         return s
     except:
         log.exception("Could not connect to: %s", (port,))
@@ -91,7 +93,8 @@ class _RobotTargetComm(threading.Thread):
                 self._debugger_impl = None
             else:
                 debugger_impl = install_robot_debugger()
-                debugger_impl.busy_wait.before_wait.append(self._notify_stopped)
+                debugger_impl.busy_wait.before_wait.append(
+                    self._notify_stopped)
 
                 log.debug("Finished patching execution context.")
                 self._debugger_impl = debugger_impl
@@ -126,7 +129,8 @@ class _RobotTargetComm(threading.Thread):
 
         reader = self._reader_thread = threading.Thread(
             target=reader_thread,
-            args=(read_from, self.process_message, self._write_queue, b"read from dap"),
+            args=(read_from, self.process_message,
+                  self._write_queue, b"read from dap"),
             name="Read from dap to robot (_RobotTargetComm)",
         )
         reader.setDaemon(True)
@@ -153,7 +157,8 @@ class _RobotTargetComm(threading.Thread):
         log = get_log()
         if protocol_message is READER_THREAD_STOPPED:
             if DEBUG:
-                log.debug("%s: READER_THREAD_STOPPED." % (self.__class__.__name__,))
+                log.debug("%s: READER_THREAD_STOPPED." %
+                          (self.__class__.__name__,))
             return
 
         if DEBUG:
@@ -209,7 +214,8 @@ class _RobotTargetComm(threading.Thread):
         capabilities.supportsConfigurationDoneRequest = True
         self.write_message(initialize_response)
         self.write_message(
-            ProcessEvent(ProcessEventBody(sys.executable, systemProcessId=os.getpid()))
+            ProcessEvent(ProcessEventBody(
+                sys.executable, systemProcessId=os.getpid()))
         )
         self.write_message(InitializedEvent())
 
@@ -250,7 +256,8 @@ class _RobotTargetComm(threading.Thread):
                         verified=True, line=source_breakpoint.line, source=source
                     ).to_dict()
                 )
-                robot_breakpoints.append(RobotBreakpoint(source_breakpoint.line))
+                robot_breakpoints.append(
+                    RobotBreakpoint(source_breakpoint.line))
 
         if self._debugger_impl:
             self._debugger_impl.set_breakpoints(filename, robot_breakpoints)
@@ -261,7 +268,8 @@ class _RobotTargetComm(threading.Thread):
         self.write_message(
             dap_base_schema.build_response(
                 request,
-                kwargs=dict(body=SetBreakpointsResponseBody(breakpoints=breakpoints)),
+                kwargs=dict(body=SetBreakpointsResponseBody(
+                    breakpoints=breakpoints)),
             )
         )
 
@@ -270,7 +278,8 @@ class _RobotTargetComm(threading.Thread):
         from robocorp_ls_core.debug_adapter_core.dap.dap_schema import ContinueResponseBody
 
         response = build_response(
-            request, kwargs=dict(body=ContinueResponseBody(allThreadsContinued=True))
+            request, kwargs=dict(
+                body=ContinueResponseBody(allThreadsContinued=True))
         )
 
         if self._debugger_impl:
@@ -407,7 +416,8 @@ class _RobotTargetComm(threading.Thread):
         else:
             response = build_response(
                 request,
-                kwargs={"body": body, "success": False, "message": error_message},
+                kwargs={"body": body, "success": False,
+                        "message": error_message},
             )
             return response
 
@@ -420,7 +430,8 @@ class _RobotTargetComm(threading.Thread):
                 result = eval_info.future.result()
             except Exception as e:
                 err = "".join(traceback.format_exception_only(type(e), e))
-                response = self._evaluate_response(request, err, error_message=err)
+                response = self._evaluate_response(
+                    request, err, error_message=err)
             else:
                 response = self._evaluate_response(request, str(result))
         else:
@@ -442,7 +453,8 @@ def main():
         import robotframework_ls
     except ImportError:
         # Automatically add it to the path if __main__ is being executed.
-        assert os.path.exists(src_folder), "Expected: %s to exist" % (src_folder,)
+        assert os.path.exists(
+            src_folder), "Expected: %s to exist" % (src_folder,)
         sys.path.append(src_folder)
         import robotframework_ls  # @UnusedImport
     robotframework_ls.import_robocorp_ls_core()
@@ -482,6 +494,16 @@ def main():
         sys.exit(1)
 
     try:
+        if debug:
+            try:
+                import debugpy
+                debugpy.listen(5678)
+                debugpy.wait_for_client()
+            except:
+                sys.stdout.write(
+                    "Module debugpy is not installed. If you want to debug python code, please install it.\n")
+                pass
+
         try:
             import robot
         except ImportError:

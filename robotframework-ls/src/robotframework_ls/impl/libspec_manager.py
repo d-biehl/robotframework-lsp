@@ -512,7 +512,7 @@ class LibspecManager(ILibspecManager):
         # thread
         self.process_pool.submit(dummy_process).result()
 
-        self.thread_pool = ThreadPoolExecutor()
+        self.thread_pool = ThreadPoolExecutor(thread_name_prefix="libspec_manager_")
 
         log.debug("Generating builtin libraries.")
         self._gen_builtin_libraries()
@@ -677,7 +677,17 @@ class LibspecManager(ILibspecManager):
                 timeout=100,
             ):
                 log.debug("Obtained mutex to generate builtins.")
-                for libname in robot_constants.STDLIBS:
+
+                def get_builtins():
+                    try:
+                        import robot.libraries
+                        return robot.libraries.STDLIBS
+                    except:
+                        pass
+
+                    return robot_constants.STDLIBS
+
+                for libname in get_builtins():
                     builtins_libspec_dir = self._builtins_libspec_dir
                     if not os.path.exists(
                         os.path.join(builtins_libspec_dir,

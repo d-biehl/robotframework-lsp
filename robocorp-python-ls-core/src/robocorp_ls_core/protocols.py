@@ -18,7 +18,7 @@ import typing
 from enum import Enum
 
 # Hack so that we don't break the runtime on versions prior to Python 3.8.
-if sys.version_info[:2] < (3, 8):
+if sys.version_info < (3, 8):
 
     class Protocol(object):
         pass
